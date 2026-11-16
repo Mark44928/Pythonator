@@ -1,6 +1,7 @@
 import unittest
 
 from pythonator.engine import Context, eval_statements, format_number, format_value, parse_expression, eval_node
+from pythonator.__main__ import parse_plot_spec
 
 class EngineTests(unittest.TestCase):
     def test_precedence(self):
@@ -48,6 +49,14 @@ class EngineTests(unittest.TestCase):
         assert ctx.memory == 42.0
         assert ctx.has_memory is True
         assert "x" not in ctx.vars
+
+    def test_plot_spec(self):
+        funcs, low, high = parse_plot_spec("sin(x), cos(x) -6.28 6.28")
+        self.assertEqual(funcs, ["sin(x)", "cos(x)"])
+        self.assertEqual((low, high), (-6.28, 6.28))
+        funcs, low, high = parse_plot_spec("sin(x)")
+        self.assertEqual(funcs, ["sin(x)"])
+        self.assertEqual((low, high), (-10.0, 10.0))
 
     def test_radix_formatting(self):
         self.assertEqual(format_value(255, 16), "0xff")

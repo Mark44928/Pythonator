@@ -110,20 +110,41 @@ def prime_factors(n):
         factors.append(n)
     return factors
 
-def plot_expression(expr, minimum, maximum):
+def parse_plot_spec(rest):
+    tokens = rest.split()
+    minimum, maximum = -10.0, 10.0
+    expression = rest
+    if len(tokens) >= 2:
+        try:
+            maximum = float(tokens[-1])
+            minimum = float(tokens[-2])
+            expression = " ".join(tokens[:-2])
+        except ValueError:
+            pass
+    funcs = [part.strip() for part in expression.split(",") if part.strip()][:3]
+    if not funcs:
+        raise EngineError("plot takes an expression and optional xmin xmax")
+    if not maximum > minimum:
+        raise EngineError("plot needs xmax > xmin")
+    return funcs, minimum, maximum
+
+def plot_expression(expressions, minimum, maximum):
     width = 57
     height = 17
-    values = []
-    for column in range(width):
-        x = minimum + (maximum - minimum) * column / (width - 1)
-        context = Context()
-        context.vars["x"] = x
-        try:
-            value = eval_node(parse_expression(expr), context)
-            values.append(value if math.isfinite(value) else None)
-        except EngineError:
-            values.append(None)
-    finite = [value for value in values if value is not None]
+    series = []
+    for expr in expressions:
+        values = []
+        for column in range(width):
+            x = minimum + (maximum - minimum) * column / (width - 1)
+            context = Context()
+            context.vars["x"] = x
+            try:
+                value = eval_node(parse_expression(expr), context)
+                values.append(value if math.isfinite(value) else None)
+            except EngineError:
+                values.append(None)
+        series.append(values)
+    finite = [value for values in series for value in values if value is not None]
     if not finite:
         raise EngineError(f"no real values in [{minimum}, {maximum}]")
     y_min, y_max = min(finite), max(finite)
@@ -134,15 +155,19 @@ def plot_expression(expr, minimum, maximum):
     y_min -= pad
     y_max += pad
     grid = [[" "] * width for _ in range(height)]
-    for column, value in enumerate(values):
-        if value is None:
-            continue
-        row = round((y_max - value) / (y_max - y_min) * (height - 1))
-        row = max(0, min(height - 1, row))
-        grid[row][column] = "█"
+    marks = ("█", "+", "*")
+    for index, values in enumerate(series):
+        for column, value in enumerate(values):
+            if value is None:
+                continue
+            row = round((y_max - value) / (y_max - y_min) * (height - 1))
+            row = max(0, min(height - 1, row))
+            grid[row][column] = marks[index]
     for row in grid:
         print("".join(row).rstrip())
     print(f"x {format_number(minimum)} … {format_number(maximum)}   y {format_number(y_min)} … {format_number(y_max)}")
+    for index, expr in enumerate(expressions):
+        print(f"  {marks[index]}  {expr}")
 
 def help_text(version):
     return f"""Pythonator {version} — a dependency-free Python calculator REPL
@@ -431,14 +456,9 @@ def run_repl():
             continue
         if command == "plot":
             try:
-                expression, _, span = rest.partition(" ")
-                bounds = [float(part) for part in span.split()] if span else [-10.0, 10.0]
-                if len(bounds) == 1:
-                    bounds = [-10.0, bounds[0]]
-                if len(bounds) != 2:
-                    raise EngineError("plot takes an expression and optional xmin xmax")
-                plot_expression(expression, bounds[0], bounds[1])
-            except EngineError as exc:
+                expressions, minimum, maximum = parse_plot_spec(rest)
+                plot_expression(expressions, minimum, maximum)
+            except (EngineError, ValueError) as exc:
                 print(paint(theme.error, str(exc)))
             continue
         try:

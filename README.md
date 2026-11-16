@@ -34,6 +34,12 @@ Pythonator keeps Plusalator’s visual language:
 - a raw-mode line editor: arrow keys, Home/End, Delete, Ctrl+A/E/U/K/L/F, bracketed paste, prefix history and ghost autosuggest
 - `theme <name>`, `angle rad|deg|grad`, `mode dec|hex|bin|sci`, memory slots, `help`, `vars`, `funcs`, `stats`, `primes`, `factorize`, `table` and `plot`
 
+## Screenshots
+
+| REPL and stats | Hex/scientific modes + memory | Multi-curve plot |
+|---|---|---|
+| ![Pythonator REPL](docs/screenshot-repl.png) | ![Pythonator modes](docs/screenshot-modes.png) | ![Pythonator plot](docs/screenshot-plot.png) |
+
 ## Usage
 
 Headless:
