@@ -1,6 +1,6 @@
 import unittest
 
-from pythonator.engine import Context, eval_statements, format_number, parse_expression, eval_node
+from pythonator.engine import Context, eval_statements, format_number, format_value, parse_expression, eval_node
 
 class EngineTests(unittest.TestCase):
     def test_precedence(self):
@@ -36,6 +36,25 @@ class EngineTests(unittest.TestCase):
     def test_unknown_variable(self):
         with self.assertRaises(Exception):
             self.evaluate("no_such_variable")
+
+    def test_reset_preserves_settings_and_memory(self):
+        ctx = Context()
+        ctx.radix = 16
+        ctx.memory = 42.0
+        ctx.has_memory = True
+        ctx.set_var("x", 9)
+        ctx.reset()
+        assert ctx.radix == 16
+        assert ctx.memory == 42.0
+        assert ctx.has_memory is True
+        assert "x" not in ctx.vars
+
+    def test_radix_formatting(self):
+        self.assertEqual(format_value(255, 16), "0xff")
+        self.assertEqual(format_value(5, 2), "0b101")
+        self.assertEqual(format_value(-10, 16), "-0xa")
+        self.assertIn("e", format_value(1234, 0))
+        self.assertEqual(format_value(1234.5, 16), "1234.5")
 
     def evaluate(self, text):
         ctx = Context()

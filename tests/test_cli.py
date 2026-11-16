@@ -1,16 +1,29 @@
 import json
+import os
 import pathlib
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 class CliTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.config_dir = tempfile.TemporaryDirectory()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.config_dir.cleanup()
+
     def run_cli(self, *args):
+        env = os.environ.copy()
+        env["XDG_CONFIG_HOME"] = self.config_dir.name
         return subprocess.run(
             [sys.executable, "-m", "pythonator", *args],
             cwd=ROOT,
+            env=env,
             text=True,
             capture_output=True,
             check=False,

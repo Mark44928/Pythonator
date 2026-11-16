@@ -28,11 +28,11 @@ python -m pythonator
 Pythonator keeps Plusalator’s visual language:
 
 - a pyfiglet `standard` banner for Pythonator, rendered through an accent → prompt → result gradient
-- a full-width gradient rule with the current theme, var/function count and angle unit on the right
+- a full-width gradient rule with the current theme, var/function count, angle unit, radix mode and memory flag
 - the `⟨ py ⟩ ➤` prompt, dim `⟨ ·· ⟩ ➤` transient line and colored `= result`
 - all 18 Plusalator theme names, with the same RGB tables
 - a raw-mode line editor: arrow keys, Home/End, Delete, Ctrl+A/E/U/K/L/F, bracketed paste, prefix history and ghost autosuggest
-- `theme <name>`, `angle rad|deg|grad`, `help`, `vars`, `funcs`, `stats`, `primes`, `factorize`, `table` and `plot`
+- `theme <name>`, `angle rad|deg|grad`, `mode dec|hex|bin|sci`, memory slots, `help`, `vars`, `funcs`, `stats`, `primes`, `factorize`, `table` and `plot`
 
 ## Usage
 
@@ -64,7 +64,7 @@ median 3
 stddev 1.4142135623730951
 ```
 
-Commands: `help`, `vars`, `funcs`, `reset`, `del <name>`, `theme [name]`, `angle rad|deg|grad`, `stats`, `primes [n]`, `factorize <n>`, `table <expr> [a b]`, `plot <expr> [a b]`, `exit`.
+Commands: `help`, `vars`, `funcs`, `reset`, `del <name>`, `theme [name]`, `angle rad|deg|grad`, `mode dec|hex|bin|sci`, `ms`/`mr`/`m+`/`m-`/`mc`, `stats`, `primes [n]`, `factorize <n>`, `table <expr> [a b]`, `plot <expr> [a b]`, `exit`.
 
 ## Engine
 
@@ -72,6 +72,8 @@ Commands: `help`, `vars`, `funcs`, `reset`, `del <name>`, `theme [name]`, `angle
 - Postfix `%` and `!`
 - Implicit multiplication: `2x`, `2(3+4)`, `(2+3)(4+5)`
 - Literals: decimal, `0x`, `0b`, `0o`
+- Output radix: decimal, hex (`0xff`), binary (`0b101`) or scientific notation
+- Memory slots: `ms`, `mr`, `m+`, `m-`, `mc`; the status line shows `M` while memory is live
 - Built-in functions: sqrt, cbrt, sin/cos/tan and inverses, asinh/acosh/atanh, log/log2/ln/exp, abs, floor/ceil/round/sign, isprime/nextprime/prevprime, min/max, clamp, gcd/lcm, pow, mod, hypot, ncr/npr, fact
 - Built-in constants: pi, tau, phi, grav, G, kB, R, NA, c, h, hbar, sigma, eps0, mu0, u, m_e, m_p, e
 - User functions: `f(x)=x^2+1`

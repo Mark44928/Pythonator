@@ -243,6 +243,9 @@ class Context:
         self.vars["ans"] = 0.0
         self.functions = {}
         self.angle = "rad"
+        self.radix = 10
+        self.memory = 0.0
+        self.has_memory = False
         self.depth = 0
 
     def reset(self):
@@ -485,3 +488,17 @@ def format_number(value):
     if "e" not in text and "E" not in text:
         return text.rstrip("0").rstrip(".") if "." in text else text
     return text.replace("e+0", "e").replace("e-0", "e-")
+
+def format_value(value, radix=10):
+    if not math.isfinite(value):
+        return format_number(value)
+    if radix in (16, 2) and value == math.floor(value) and abs(value) < 9.2e18:
+        negative = value < 0
+        number = int(abs(value))
+        if radix == 16:
+            text = format(number, "x")
+            return ("-" if negative else "") + "0x" + text
+        return ("-" if negative else "") + "0b" + format(number, "b")
+    if radix == 0:
+        return format(value, ".6e")
+    return format_number(value)

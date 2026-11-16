@@ -8,7 +8,7 @@ import sys
 import tempfile
 
 from . import __version__
-from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number
+from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value
 from .lineedit import LineEditor
 from .theme import ALL_THEMES, color, get_theme, theme_names
 
@@ -51,7 +51,7 @@ def load_config():
             return data
     except (OSError, ValueError):
         pass
-    return {"theme": "greenit", "angle": "rad"}
+    return {"theme": "greenit", "angle": "rad", "mode": "dec"}
 
 def save_config(config):
     path = config_path()
@@ -72,9 +72,16 @@ def last_result(results):
             return value
     return None
 
-def eval_cli(expression, angle="rad"):
+def radix_for_mode(mode):
+    return {"hex": 16, "bin": 2, "sci": 0}.get(mode, 10)
+
+def mode_for_radix(radix):
+    return "hex" if radix == 16 else "bin" if radix == 2 else "sci" if radix == 0 else "dec"
+
+def eval_cli(expression, angle="rad", mode="dec"):
     context = Context()
     context.angle = angle
+    context.radix = radix_for_mode(mode)
     return last_result(eval_statements(expression, context))
 
 def parse_numbers(arguments):
@@ -152,6 +159,11 @@ Commands:
   del <name>            delete a variable or function
   theme [name]          list themes or set the active theme
   angle rad|deg|grad    set the angle unit
+  mode dec|hex|bin|sci  set the output radix
+  ms [expr]             store in memory
+  mr                    recall memory
+  m+ [expr] / m- [expr] add to / subtract from memory
+  mc                    clear memory
   stats <n...>          count/min/max/sum/mean/median/stddev
   primes [n]            list primes up to n
   factorize <n>         prime factorization of n
@@ -186,6 +198,10 @@ def rule_line(theme, context):
     status = f"{theme.name} · {len(context.vars)} vars {len(context.functions)} funcs"
     if context.angle != "rad":
         status += f" · {context.angle}"
+    if context.radix != 10:
+        status += f" · {mode_for_radix(context.radix)}"
+    if context.has_memory:
+        status += " · M"
     try:
         width = os.get_terminal_size().columns
     except OSError:
@@ -233,6 +249,7 @@ def run_repl():
     theme = get_theme(config.get("theme", "greenit"))
     context = Context()
     context.angle = config.get("angle", "rad")
+    context.radix = radix_for_mode(config.get("mode", "dec"))
     editor = LineEditor(history_path())
     error_flash = False
     print_banner(theme)
@@ -316,6 +333,43 @@ def run_repl():
             else:
                 print(paint(theme.hint, f"angle is {context.angle}"))
             continue
+        if command == "mode":
+            if rest in ("dec", "hex", "bin", "sci"):
+                context.radix = radix_for_mode(rest)
+                config["mode"] = rest
+                save_config(config)
+                print(paint(theme.prompt, f"mode {rest}"))
+            else:
+                print(paint(theme.hint, f"mode is {mode_for_radix(context.radix)}"))
+            continue
+        if command in ("ms", "m+", "m-"):
+            try:
+                if rest:
+                    value = last_result(eval_statements(rest, context))
+                    if value is None:
+                        value = context.vars.get("ans", 0.0)
+                else:
+                    value = context.vars.get("ans", 0.0)
+                if command == "ms":
+                    context.memory = value
+                elif command == "m+":
+                    context.memory += value
+                else:
+                    context.memory -= value
+                context.has_memory = True
+                print(paint(theme.prompt, "memory ") + paint(theme.result, format_value(context.memory, context.radix)))
+            except EngineError as exc:
+                print(paint(theme.error, str(exc)))
+            continue
+        if command == "mr":
+            context.vars["ans"] = context.memory
+            print(paint(theme.hint, "memory ") + paint(theme.result, format_value(context.memory, context.radix)))
+            continue
+        if command == "mc":
+            context.memory = 0.0
+            context.has_memory = False
+            print(paint(theme.prompt, "memory cleared"))
+            continue
         if command == "stats":
             try:
                 values = parse_numbers(rest)
@@ -391,7 +445,7 @@ def run_repl():
             results = eval_statements(line, context)
             value = last_result(results)
             if value is not None:
-                print(paint(theme.result, "= " + format_number(value)))
+                print(paint(theme.result, "= " + format_value(value, context.radix)))
         except EngineError as exc:
             error_flash = True
             print_error(theme, line, exc)
@@ -414,12 +468,13 @@ def main(argv=None):
     if args.expression is not None:
         config = load_config()
         theme = get_theme(config.get("theme", "greenit"))
+        mode = config.get("mode", "dec")
         try:
-            result = eval_cli(args.expression, config.get("angle", "rad"))
+            result = eval_cli(args.expression, config.get("angle", "rad"), mode)
             if args.json:
                 print(json.dumps({"expression": args.expression, "result": result}, separators=(",", ":")))
             elif result is not None:
-                text = format_number(result)
+                text = format_value(result, radix_for_mode(mode))
                 print(paint(theme.result, text) if color_enabled() else text)
             return 0
         except EngineError as exc:
