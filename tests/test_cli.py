@@ -31,7 +31,7 @@ class CliTests(unittest.TestCase):
     def test_error(self):
         result = self.run_cli("--eval", "1/0")
         self.assertEqual(result.returncode, 0)
-        self.assertIn("division by zero", result.stderr)
+        self.assertIn("division by zero", result.stdout)
 
 if __name__ == "__main__":
     unittest.main()

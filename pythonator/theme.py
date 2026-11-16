@@ -1,35 +1,56 @@
-THEMES = {
-    "greenit": ("#7BD88F", "#C9E4CE", "#9BEDAF", "#63C9A8", "#78997F"),
-    "mono": ("#E6E6E6", "#F0F0F0", "#A0A0A0", "#BDBDBD", "#737373"),
-    "ocean": ("#00B4FF", "#BCEBFF", "#51E0FF", "#0096FE", "#4E6B7B"),
-    "ember": ("#FF7B28", "#FFB18A", "#F55A3C", "#FF9C58", "#7A3A1C"),
-    "sakura": ("#FFB4DC", "#FFDCEF", "#FDA4CD", "#DD62A5", "#8E5A6C"),
-    "midnight": ("#96B4FF", "#C7D3FF", "#B09BFF", "#6A78FF", "#454A63"),
-    "nord": ("#88C0D0", "#ECEFF4", "#81A1C1", "#8FBCBB", "#4C566A"),
-    "catppuccin": ("#89B4FA", "#CDD6F4", "#CBA6F7", "#74C7EC", "#585B70"),
-    "tokyonight": ("#7AA2F7", "#C0CAF5", "#BB9AF7", "#7DCFFF", "#565F89"),
-    "dracula": ("#BD93F9", "#F8F8F2", "#FF79C6", "#8BE9FD", "#6272A4"),
-    "gruvbox": ("#FABD2F", "#EBDBB2", "#83A598", "#B8BB26", "#665C54"),
-    "solarized": ("#268BD2", "#839496", "#2AA198", "#B58900", "#586E75"),
-    "cyberpunk": ("#00FFFF", "#FFE066", "#FF2BD6", "#00FFFF", "#46305F"),
-    "matrix": ("#00FF43", "#B4FFB4", "#00C853", "#69FF8A", "#003510"),
-    "sunset": ("#FF9A4D", "#FFDFC2", "#FFD166", "#EF476F", "#623B3B"),
-    "aurora": ("#B48CFF", "#E8DFF8", "#9E7DF2", "#64D2FF", "#48345F"),
-    "neon": ("#00FFFF", "#E6FFFF", "#FF00FF", "#FFFF00", "#3E2063"),
-    "retro": ("#FFBF00", "#FFE89A", "#FFB000", "#FF7B00", "#594400"),
-}
+from dataclasses import dataclass
 
-def rgb(value):
-    value = value.lstrip("#")
-    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+@dataclass(frozen=True)
+class Theme:
+    name: str
+    prompt: tuple
+    result: tuple
+    error: tuple
+    hint: tuple
+    rule: tuple
+    accent: tuple
+
+ALL_THEMES = [
+    Theme("greenit", (123, 216, 143), (201, 228, 206), (192, 122, 110), (120, 153, 127), (18, 42, 31), (99, 201, 168)),
+    Theme("mono", (220, 220, 220), (240, 240, 240), (255, 80, 80), (130, 130, 130), (80, 80, 80), (220, 220, 220)),
+    Theme("ocean", (0, 180, 255), (240, 240, 240), (255, 100, 100), (150, 150, 150), (90, 90, 90), (0, 180, 255)),
+    Theme("ember", (255, 120, 40), (240, 240, 240), (255, 100, 80), (150, 150, 150), (90, 80, 70), (255, 120, 40)),
+    Theme("sakura", (255, 180, 220), (240, 240, 240), (255, 100, 140), (160, 140, 160), (100, 90, 100), (255, 180, 220)),
+    Theme("midnight", (150, 180, 255), (240, 240, 240), (255, 120, 150), (120, 120, 120), (60, 60, 80), (150, 180, 255)),
+    Theme("nord", (143, 188, 187), (236, 239, 244), (191, 97, 106), (216, 222, 233), (59, 66, 82), (136, 192, 208)),
+    Theme("catppuccin", (245, 224, 220), (205, 214, 244), (243, 139, 168), (180, 190, 254), (205, 214, 244), (137, 180, 250)),
+    Theme("tokyonight", (192, 202, 245), (122, 162, 247), (247, 118, 142), (187, 154, 247), (26, 27, 38), (125, 207, 255)),
+    Theme("dracula", (248, 248, 242), (248, 248, 242), (255, 85, 85), (98, 114, 164), (40, 42, 54), (189, 147, 249)),
+    Theme("gruvbox", (235, 219, 178), (235, 219, 178), (251, 73, 52), (168, 153, 132), (80, 73, 69), (211, 134, 155)),
+    Theme("solarized", (131, 148, 150), (131, 148, 150), (220, 50, 47), (88, 110, 117), (7, 54, 66), (38, 139, 210)),
+    Theme("cyberpunk", (0, 255, 255), (220, 220, 220), (255, 0, 150), (150, 50, 200), (80, 80, 200), (0, 255, 255)),
+    Theme("matrix", (0, 255, 43), (0, 255, 0), (0, 255, 0), (0, 179, 0), (0, 50, 50), (0, 255, 43)),
+    Theme("sunset", (255, 154, 77), (255, 255, 255), (255, 100, 50), (255, 180, 100), (120, 80, 60), (255, 119, 197)),
+    Theme("aurora", (180, 140, 255), (240, 240, 240), (255, 100, 200), (160, 140, 200), (90, 80, 120), (140, 100, 255)),
+    Theme("neon", (0, 255, 255), (255, 255, 255), (255, 0, 150), (0, 255, 255), (100, 0, 255), (0, 255, 255)),
+    Theme("retro", (255, 191, 0), (220, 220, 220), (255, 150, 0), (100, 80, 50), (50, 50, 50), (255, 215, 0)),
+]
+THEMES = {theme.name: theme for theme in ALL_THEMES}
 
 def get_theme(name):
     return THEMES.get(name, THEMES["greenit"])
 
 def theme_names():
-    return list(THEMES)
+    return [theme.name for theme in ALL_THEMES]
 
-def color(value, text, bold=False):
-    r, g, b = rgb(value)
-    prefix = "\033[1;38;2" if bold else "\033[38;2"
-    return f"{prefix};{r};{g};{b}m{text}\033[0m"
+def rgb(value):
+    return value
+
+def color(value, text, bold=False, dim=False, italic=False):
+    if not text:
+        return ""
+    r, g, b = value
+    codes = []
+    if bold:
+        codes.append("1")
+    if dim:
+        codes.append("2")
+    if italic:
+        codes.append("3")
+    codes.append(f"38;2;{r};{g};{b}")
+    return f"\033[{';'.join(codes)}m{text}\033[0m"

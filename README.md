@@ -23,6 +23,17 @@ From a clone without installing:
 python -m pythonator
 ```
 
+## The Plusalator look
+
+Pythonator keeps Plusalator’s visual language:
+
+- the same figlet banner, rendered through an accent → prompt → result gradient
+- a full-width gradient rule with the current theme, var/function count and angle unit on the right
+- the `⟨ py ⟩ ➤` prompt, dim `⟨ ·· ⟩ ➤` transient line and colored `= result`
+- all 18 Plusalator theme names, with the same RGB tables
+- a raw-mode line editor: arrow keys, Home/End, Delete, Ctrl+A/E/U/K/L/F, bracketed paste, prefix history and ghost autosuggest
+- `theme <name>`, `angle rad|deg|grad`, `help`, `vars`, `funcs`, `stats`, `primes`, `factorize`, `table` and `plot`
+
 ## Usage
 
 Headless:

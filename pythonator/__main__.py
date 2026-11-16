@@ -9,20 +9,38 @@ import tempfile
 
 from . import __version__
 from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number
-from .theme import THEMES, color, theme_names
+from .lineedit import LineEditor
+from .theme import ALL_THEMES, color, get_theme, theme_names
 
+BANNER = r"""
+ ____  _                 _       _
+|  _ \| |_   _ ___  __ _| | __ _| |_ ___
+| |_) | | | | / __|/ _` | |/ _` | __/ _ \
+|  __/| | |_| \__ \ (_| | | (_| | || (_) |
+|_|   |_|\__,_|___/\__,_|_|\__,_|\__\___/
+"""
+
+def color_enabled():
+    if os.environ.get("NO_COLOR"):
+        return False
+    if os.environ.get("FORCE_COLOR"):
+        return True
+    return sys.stdout.isatty() and os.environ.get("TERM", "") != "dumb"
+
+def paint(value, text, bold=False, dim=False, italic=False):
+    if not color_enabled():
+        return text
+    return color(value, text, bold=bold, dim=dim, italic=italic)
 
 def config_path():
     xdg = os.environ.get("XDG_CONFIG_HOME")
     base = pathlib.Path(xdg).expanduser() if xdg else pathlib.Path.home() / ".config"
     return base / "pythonator" / "config.json"
 
-
 def history_path():
     xdg = os.environ.get("XDG_STATE_HOME")
     base = pathlib.Path(xdg).expanduser() if xdg else pathlib.Path.home() / ".local" / "state"
     return base / "pythonator" / "history"
-
 
 def load_config():
     path = config_path()
@@ -33,7 +51,6 @@ def load_config():
     except (OSError, ValueError):
         pass
     return {"theme": "greenit", "angle": "rad"}
-
 
 def save_config(config):
     path = config_path()
@@ -48,47 +65,16 @@ def save_config(config):
         if os.path.exists(tmp):
             os.unlink(tmp)
 
-
-def load_history():
-    try:
-        lines = history_path().read_text(encoding="utf-8", errors="ignore").splitlines()
-        cleaned = []
-        for line in lines:
-            line = "".join(ch for ch in line if ch.isprintable())
-            if line:
-                cleaned.append(line)
-        return cleaned[-200:]
-    except OSError:
-        return []
-
-
-def save_history(history):
-    path = history_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    fd, tmp = tempfile.mkstemp(prefix="pythonator_history_", dir=str(path.parent))
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            for line in history[-200:]:
-                handle.write(line + "\n")
-        os.replace(tmp, path)
-    finally:
-        if os.path.exists(tmp):
-            os.unlink(tmp)
-
-
 def last_result(results):
     for value in reversed(results):
         if value is not None:
             return value
     return None
 
-
 def eval_cli(expression, angle="rad"):
     context = Context()
     context.angle = angle
-    results = eval_statements(expression, context)
-    return last_result(results)
-
+    return last_result(eval_statements(expression, context))
 
 def parse_numbers(arguments):
     cleaned = arguments.replace(",", " ").replace(";", " ").split()
@@ -103,7 +89,6 @@ def parse_numbers(arguments):
         values.append(value)
     return values
 
-
 def prime_factors(n):
     n = int(abs(n))
     factors = []
@@ -116,7 +101,6 @@ def prime_factors(n):
     if n > 1:
         factors.append(n)
     return factors
-
 
 def plot_expression(expr, minimum, maximum):
     width = 57
@@ -152,7 +136,6 @@ def plot_expression(expr, minimum, maximum):
         print("".join(row).rstrip())
     print(f"x {format_number(minimum)} … {format_number(maximum)}   y {format_number(y_min)} … {format_number(y_max)}")
 
-
 def help_text(version):
     return f"""Pythonator {version} — a dependency-free Python calculator REPL
 Usage:
@@ -173,164 +156,206 @@ Commands:
   factorize <n>         prime factorization of n
   table <expr> [a b]     evaluate f(x) across a range
   plot <expr> [a b]      ASCII plot across a range
+  version               show version
   exit, quit, q          leave Pythonator
 """
 
+def banner_rows():
+    rows = [row.rstrip() for row in BANNER.strip("\n").splitlines()]
+    return [row for row in rows if row]
 
-def main(argv=None):
-    parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--eval", dest="expression")
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("--help", "-h", action="store_true")
-    parser.add_argument("--version", "-V", action="store_true")
-    args, remaining = parser.parse_known_args(argv)
-    if args.help:
-        print(help_text(__version__), end="")
-        return 0
-    if args.version:
-        print(f"pythonator {__version__}")
-        return 0
-    if args.expression is not None:
-        try:
-            result = eval_cli(args.expression)
-            if args.json:
-                print(json.dumps({"expression": args.expression, "result": result}, separators=(",", ":")))
-            elif result is not None:
-                print(format_number(result))
-            return 0
-        except EngineError as exc:
-            if args.json:
-                print(json.dumps({"expression": args.expression, "error": str(exc)}, separators=(",", ":")))
-                return 0
-            print(args.expression, file=sys.stderr)
-            print("^", file=sys.stderr)
-            print(str(exc), file=sys.stderr)
-            return 0
-    if args.json:
-        print("--json requires --eval <expr>", file=sys.stderr)
-        return 2
-    return run_repl()
+def print_banner(theme):
+    rows = banner_rows()
+    count = len(rows)
+    for index, row in enumerate(rows):
+        f = index / (count - 1) if count > 1 else 0.0
+        if f < 0.33:
+            t = f * 3.0
+            base, target = theme.accent, theme.prompt
+        elif f < 0.66:
+            t = (f - 0.33) * 3.0
+            base, target = theme.prompt, theme.result
+        else:
+            t = min(1.0, max(0.0, (f - 0.66) * 3.0))
+            base, target = theme.result, theme.accent
+        mixed = tuple(round(base[i] * (1 - t) + target[i] * t) for i in range(3))
+        print(paint(mixed, row, bold=True))
 
+def rule_line(theme, context):
+    status = f"{theme.name} · {len(context.vars)} vars {len(context.functions)} funcs"
+    if context.angle != "rad":
+        status += f" · {context.angle}"
+    try:
+        width = os.get_terminal_size().columns
+    except OSError:
+        width = 80
+    cells = max(0, width - len(status) - 2)
+    parts = []
+    for index in range(cells):
+        f = 1.0 - abs(2.0 * index / (cells - 1) - 1.0) if cells > 1 else 1.0
+        mixed = tuple(round(theme.hint[i] * (1 - f) + theme.accent[i] * f) for i in range(3))
+        parts.append(paint(mixed, "─"))
+    print("".join(parts) + "  " + paint(theme.hint, status, dim=True))
 
-def run_repl(context=None, input_func=input, output=print):
+def prompt_text(theme, error_flash):
+    bracket = paint(theme.accent, "⟨", bold=True)
+    name = paint(theme.hint, "py", italic=True)
+    close = paint(theme.accent, "⟩")
+    accent = (255, 100, 140) if error_flash else theme.accent
+    arrow = paint(accent, "➤", bold=True)
+    return f"{bracket} {name} {close} {arrow} "
+
+def transient_prompt(theme):
+    return (
+        paint(theme.hint, "⟨", dim=True)
+        + " "
+        + paint(theme.hint, "··", dim=True)
+        + " "
+        + paint(theme.hint, "⟩", dim=True)
+        + " "
+        + paint(theme.hint, "➤", bold=True, dim=True)
+        + " "
+    )
+
+def print_transient(theme, line):
+    text = paint(theme.hint, "⟨ ·· ⟩ ➤ " + line, dim=True)
+    sys.stdout.write("\r\033[K" + text + "\n")
+    sys.stdout.flush()
+
+def print_error(theme, line, error, column=1):
+    print(paint(theme.prompt, line))
+    print(" " * max(0, column - 1) + paint(theme.error, "^"))
+    print(paint(theme.error, str(error)))
+
+def run_repl():
     config = load_config()
-    theme = THEMES.get(config.get("theme"), THEMES["greenit"])
-    history = load_history()
-    context = context or Context()
+    theme = get_theme(config.get("theme", "greenit"))
+    context = Context()
     context.angle = config.get("angle", "rad")
-    rule = color(theme[2], "─" * 57) if sys.stdout.isatty() else "─" * 57
-    banner = color(theme[0], "⟨ py ⟩", bold=True) + " Pythonator" if sys.stdout.isatty() else "Pythonator"
-    output(banner)
-    output(rule)
-    output(color(theme[3], "type help for commands; 2+3*4 works") if sys.stdout.isatty() else "type help for commands; 2+3*4 works")
-
-    def save_state():
-        config["theme"] = config.get("theme", "greenit")
-        config["angle"] = context.angle
-        save_config(config)
-        save_history(history)
-
+    editor = LineEditor(history_path())
+    error_flash = False
+    print_banner(theme)
+    print(
+        paint(theme.hint, "Tip: type ")
+        + paint(theme.prompt, "help", bold=True)
+        + paint(theme.hint, " for commands, or enter an expression to calculate.")
+    )
     while True:
-        try:
-            line = input_func(color(theme[0], "⟨ py ⟩ ") if sys.stdout.isatty() else "py> ")
-        except (EOFError, KeyboardInterrupt):
-            output("")
-            save_state()
-            return 0
-        stripped = line.strip()
-        if not stripped:
+        rule_line(theme, context)
+        editor.transient_prompt = transient_prompt(theme)
+        line = editor.edit(prompt_text(theme, error_flash))
+        error_flash = False
+        if line is None:
+            break
+        if not isinstance(line, str) or not line.strip():
             continue
-        if not history or stripped != history[-1]:
-            history.append(stripped)
+        print_transient(theme, line)
+        stripped = line.strip()
         command, _, rest = stripped.partition(" ")
         command = command.lower()
         rest = rest.strip()
         if command in ("exit", "quit", "q"):
-            save_state()
-            return 0
+            break
         if command == "help":
-            output(help_text(__version__), end="")
+            print(help_text(__version__), end="")
+            continue
+        if command == "version" or command == "about":
+            print(paint(theme.prompt, f"pythonator {__version__}", bold=True))
             continue
         if command == "clear":
-            output("\033[2J\033[H", end="")
+            sys.stdout.write("\033[2J\033[H")
+            sys.stdout.flush()
+            print_banner(theme)
+            print(
+                paint(theme.hint, "Tip: type ")
+                + paint(theme.prompt, "help", bold=True)
+                + paint(theme.hint, " for commands, or enter an expression to calculate.")
+            )
             continue
         if command == "vars":
             for name, value in sorted(context.vars.items()):
-                if name not in ("ans",) and not name.startswith("m_"):
-                    output(f"{name:<10} {format_number(value)}")
+                if name != "ans":
+                    print(paint(theme.hint, f"{name:<10}") + paint(theme.result, format_number(value)))
             continue
         if command == "funcs":
             for name, (params, _) in sorted(context.functions.items()):
-                output(f"{name}({', '.join(params)})")
+                print(paint(theme.prompt, f"{name}({', '.join(params)})"))
             continue
         if command == "reset":
             context.reset()
-            output("reset")
+            print(paint(theme.prompt, "reset"))
             continue
         if command == "del":
             if not rest:
-                output("del <name>")
+                print(paint(theme.error, "del <name>"))
             else:
                 context.vars.pop(rest, None)
                 context.functions.pop(rest, None)
-                output(f"deleted {rest}")
+                print(paint(theme.hint, f"deleted {rest}"))
             continue
         if command == "theme":
             if not rest:
-                output("themes: " + ", ".join(theme_names()))
-            elif rest in THEMES:
+                for name in theme_names():
+                    swatch = get_theme(name)
+                    print(paint(swatch.accent, "●", bold=True) + " " + name)
+            elif rest in theme_names():
+                theme = get_theme(rest)
                 config["theme"] = rest
-                theme = THEMES[rest]
-                save_state()
-                output(f"theme {rest}")
+                save_config(config)
+                print(paint(theme.prompt, f"theme {rest}"))
             else:
-                output(f"unknown theme: {rest}")
+                print(paint(theme.error, f"unknown theme: {rest}"))
             continue
         if command == "angle":
             if rest in ("rad", "deg", "grad"):
                 context.angle = rest
-                save_state()
-                output(f"angle {rest}")
+                config["angle"] = rest
+                save_config(config)
+                print(paint(theme.prompt, f"angle {rest}"))
             else:
-                output(f"angle is {context.angle}")
+                print(paint(theme.hint, f"angle is {context.angle}"))
             continue
         if command == "stats":
             try:
                 values = parse_numbers(rest)
                 if not values:
                     raise EngineError("stats needs numbers")
-                output(f"count  {len(values)}")
-                output(f"min    {format_number(min(values))}")
-                output(f"max    {format_number(max(values))}")
-                output(f"sum    {format_number(sum(values))}")
-                output(f"mean   {format_number(statistics.fmean(values))}")
-                output(f"median {format_number(statistics.median(values))}")
-                output(f"stddev {format_number(statistics.pstdev(values))}")
+                for label, value in (
+                    ("count", len(values)),
+                    ("min", min(values)),
+                    ("max", max(values)),
+                    ("sum", sum(values)),
+                    ("mean", statistics.fmean(values)),
+                    ("median", statistics.median(values)),
+                    ("stddev", statistics.pstdev(values)),
+                ):
+                    text = str(value) if label == "count" else format_number(value)
+                    print(paint(theme.hint, f"{label:<6}") + paint(theme.result, text))
             except EngineError as exc:
-                output(str(exc))
+                print(paint(theme.error, str(exc)))
             continue
         if command == "primes":
             try:
                 n = int(float(rest or "100"))
                 if n < 2:
-                    output("primes needs n >= 2")
+                    print(paint(theme.error, "primes needs n >= 2"))
                     continue
                 n = min(n, 1000)
                 primes = [value for value in range(2, n + 1) if all(value % d for d in range(2, int(math.sqrt(value)) + 1))]
-                output(" ".join(str(value) for value in primes))
+                print(paint(theme.result, " ".join(str(value) for value in primes)))
             except ValueError:
-                output("primes [n]")
+                print(paint(theme.error, "primes [n]"))
             continue
         if command == "factorize":
             try:
                 n = int(float(rest))
                 if n == 0:
-                    output("factorize expects n != 0")
+                    print(paint(theme.error, "factorize expects n != 0"))
                     continue
                 factors = prime_factors(n)
-                output(f"{n} = " + " × ".join(str(factor) for factor in factors))
+                print(paint(theme.result, f"{n} = " + " × ".join(str(factor) for factor in factors)))
             except ValueError:
-                output("factorize <n>")
+                print(paint(theme.error, "factorize <n>"))
             continue
         if command == "table":
             try:
@@ -345,9 +370,9 @@ def run_repl(context=None, input_func=input, output=print):
                     x = minimum + (maximum - minimum) * index / 15
                     context.vars["x"] = x
                     value = eval_node(parse_expression(expression), context)
-                    output(f"{format_number(x):>12} {format_number(value):>18}")
+                    print(paint(theme.hint, f"{format_number(x):>12}") + " " + paint(theme.result, f"{format_number(value):>18}"))
             except EngineError as exc:
-                output(str(exc))
+                print(paint(theme.error, str(exc)))
             continue
         if command == "plot":
             try:
@@ -359,16 +384,55 @@ def run_repl(context=None, input_func=input, output=print):
                     raise EngineError("plot takes an expression and optional xmin xmax")
                 plot_expression(expression, bounds[0], bounds[1])
             except EngineError as exc:
-                output(str(exc))
+                print(paint(theme.error, str(exc)))
             continue
         try:
             results = eval_statements(line, context)
             value = last_result(results)
             if value is not None:
-                output("= " + format_number(value))
+                print(paint(theme.result, "= " + format_number(value)))
         except EngineError as exc:
-            output(str(exc))
+            error_flash = True
+            print_error(theme, line, exc)
+    save_config(config)
+    print()
 
+def main(argv=None):
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--eval", dest="expression")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--help", "-h", action="store_true")
+    parser.add_argument("--version", "-V", action="store_true")
+    args, _ = parser.parse_known_args(argv)
+    if args.help:
+        print(help_text(__version__), end="")
+        return 0
+    if args.version:
+        print(f"pythonator {__version__}")
+        return 0
+    if args.expression is not None:
+        config = load_config()
+        theme = get_theme(config.get("theme", "greenit"))
+        try:
+            result = eval_cli(args.expression, config.get("angle", "rad"))
+            if args.json:
+                print(json.dumps({"expression": args.expression, "result": result}, separators=(",", ":")))
+            elif result is not None:
+                text = format_number(result)
+                print(paint(theme.result, text) if color_enabled() else text)
+            return 0
+        except EngineError as exc:
+            if args.json:
+                print(json.dumps({"expression": args.expression, "error": str(exc)}, separators=(",", ":")))
+                return 0
+            print(args.expression)
+            print("^")
+            print(str(exc))
+            return 0
+    if args.json:
+        print("--json requires --eval <expr>", file=sys.stderr)
+        return 2
+    return run_repl()
 
 if __name__ == "__main__":
     raise SystemExit(main())
