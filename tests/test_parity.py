@@ -38,8 +38,9 @@ def evaluate(command, expression, home):
     env = os.environ.copy()
     env.update({"HOME": home, "XDG_CONFIG_HOME": home, "NO_COLOR": "1", "TMPDIR": home})
     env.pop("FORCE_COLOR", None)
+    args = [*command, f"--eval={expression}"] if command[0] == sys.executable else [*command, "--eval", expression]
     result = subprocess.run(
-        [*command, "--eval", expression],
+        args,
         cwd=ROOT,
         env=env,
         text=True,
