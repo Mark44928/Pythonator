@@ -4,7 +4,7 @@ A **dependency-free Python rewrite of Plusalator**: a calculator REPL and headle
 
 ## Why
 
-Plusalator is a polished C++17 terminal calculator. Pythonator ports the same idea to Python: implicit multiplication, percent postfix, factorial, hex/bin/oct literals, user functions, built-in constants, angle units, and a REPL that stays out of your way.
+Plusalator is a terminal calculator. Pythonator ports the same idea to Python: implicit multiplication, percent postfix, factorial, hex/bin/oct literals, user functions, built-in constants, angle units, and a REPL that stays out of your way.
 
 No API key. No `eval()`. No dependencies.
 
@@ -98,4 +98,15 @@ make check
 ## Related
 
 - [Plusalator](https://github.com/Mark44928/Plusalator) — the original C++17 implementation
-- [GrubBlastersHTML](https://github.com/Mark44928/GrubBlastersHTML), [SnakTUI](https://github.com/Mark44928/SnakTUI), [CalculaHTML](https://github.com/Mark44928/CalculaHTML) — more from the same family
+- [Mark44928](https://github.com/Mark44928) — profile and project index
+- [plusafetch](https://github.com/Mark44928/plusafetch) — C++23 fetch for Termux — ~23 ms, zero subprocesses on the default path
+- [GrubBlastersHTML](https://github.com/Mark44928/GrubBlastersHTML) — Turn-based artillery in one HTML file — 72 weapons, fully destructible terrain
+- [SnakTUI](https://github.com/Mark44928/SnakTUI) — Snake game for the terminal — Textual + Python
+- [Easy-Termux-Package-Manager](https://github.com/Mark44928/Easy-Termux-Package-Manager) — fzf-driven package manager for Termux — snapshots, audit, 188 tests
+- [NoNameOS](https://github.com/Mark44928/NoNameOS) — OS simulation in a single C++17 file — virtual FS, real shell
+- [Greenit](https://github.com/Mark44928/Greenit) — green-injected theme family — dark + light, single palette.json
+- [Bluney](https://github.com/Mark44928/Bluney) — blue-injected theme family — dark + light, single palette.json
+- [CalculaHTML](https://github.com/Mark44928/CalculaHTML) — static HTML calculator — 15 themes + System mode, zero deps
+- [android12-fastfetch](https://github.com/Mark44928/android12-fastfetch) — fastfetch config for Android 12 + native X11 Termux desktops
+- [Android9-audios](https://github.com/Mark44928/Android9-audios) — 217 stock Android 9 system sounds + per-file SHA-256
+- [Anti-bloatware-list-for-Android-TV-Boxes-and-Sticks-for-rooted](https://github.com/Mark44928/Anti-bloatware-list-for-Android-TV-Boxes-and-Sticks-for-rooted) — ADB debloat for rooted Android 9+ TV sticks & boxes
