@@ -8,7 +8,7 @@ import sys
 import tempfile
 
 from . import __version__
-from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value
+from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value, format_ast, FUNCTION_DEF, VARIABLE_ASSIGN
 from .lineedit import LineEditor
 from .theme import ALL_THEMES, color, get_theme, theme_names
 
@@ -110,6 +110,27 @@ def prime_factors(n):
         factors.append(n)
     return factors
 
+def explain_text(rest, context):
+    function = FUNCTION_DEF.match(rest)
+    if function:
+        name, raw_params, body = function.groups()
+        params = [part.strip() for part in raw_params.split(",") if part.strip()]
+        return (
+            f"function {name.lower()}({', '.join(params)}) =\n"
+            + format_ast(parse_expression(body))
+        )
+    assignment = VARIABLE_ASSIGN.match(rest)
+    if assignment and not rest.startswith("("):
+        name, body = assignment.groups()
+        return f"variable {name} =\n" + format_ast(parse_expression(body))
+    node = parse_expression(rest)
+    tree = format_ast(node)
+    try:
+        value = eval_node(node, context)
+    except EngineError as exc:
+        return tree + f"\n# {exc}"
+    return tree + f"\n= {format_value(value, context.radix)}"
+
 def parse_plot_spec(rest):
     tokens = rest.split()
     minimum, maximum = -10.0, 10.0
@@ -189,6 +210,7 @@ Commands:
   mr                    recall memory
   m+ [expr] / m- [expr] add to / subtract from memory
   mc                    clear memory
+  explain <expr>          show the parsed expression tree
   stats <n...>          count/min/max/sum/mean/median/stddev
   primes [n]            list primes up to n
   factorize <n>         prime factorization of n
@@ -453,6 +475,15 @@ def run_repl():
                     print(paint(theme.hint, f"{format_number(x):>12}") + " " + paint(theme.result, f"{format_number(value):>18}"))
             except EngineError as exc:
                 print(paint(theme.error, str(exc)))
+            continue
+        if command == "explain":
+            if not rest:
+                print(paint(theme.error, "explain <expr>"))
+            else:
+                try:
+                    print(explain_text(rest, context))
+                except EngineError as exc:
+                    print(paint(theme.error, str(exc)))
             continue
         if command == "plot":
             try:

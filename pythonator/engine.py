@@ -288,6 +288,41 @@ def to_angle(value, mode):
 def from_angle(value, mode):
     return math.radians(value) if mode == "deg" else math.radians(value) * 0.9 if mode == "grad" else value
 
+def format_ast(node):
+    lines = []
+
+    def walk(item, prefix="", is_last=True):
+        branch = "└─ " if is_last else "├─ "
+        if isinstance(item, Num):
+            lines.append(f"{prefix}{branch}Num {format_number(item.value)}")
+            return
+        if isinstance(item, Var):
+            lines.append(f"{prefix}{branch}Var {item.name}")
+            return
+        if isinstance(item, Unary):
+            label = {"-": "Negate", "!": "Factorial", "%": "Percent"}.get(item.op, item.op)
+            lines.append(f"{prefix}{branch}{label}")
+            child_prefix = prefix + ("   " if is_last else "│  ")
+            walk(item.expr, child_prefix, True)
+            return
+        if isinstance(item, Binary):
+            lines.append(f"{prefix}{branch}Binary {item.op}")
+            child_prefix = prefix + ("   " if is_last else "│  ")
+            walk(item.left, child_prefix, False)
+            walk(item.right, child_prefix, True)
+            return
+        if isinstance(item, Call):
+            lines.append(f"{prefix}{branch}Call {item.name}(")
+            child_prefix = prefix + ("   " if is_last else "│  ")
+            for index, arg in enumerate(item.args):
+                walk(arg, child_prefix, index == len(item.args) - 1)
+            return
+        lines.append(f"{prefix}{branch}Unknown")
+
+    lines.append("Expression")
+    walk(node, "", True)
+    return "\n".join(lines)
+
 def eval_node(node, ctx):
     if isinstance(node, Num):
         return node.value

@@ -1,6 +1,6 @@
 import unittest
 
-from pythonator.engine import Context, eval_statements, format_number, format_value, parse_expression, eval_node
+from pythonator.engine import Context, eval_statements, format_number, format_value, parse_expression, eval_node, format_ast
 from pythonator.__main__ import parse_plot_spec
 
 class EngineTests(unittest.TestCase):
@@ -57,6 +57,13 @@ class EngineTests(unittest.TestCase):
         funcs, low, high = parse_plot_spec("sin(x)")
         self.assertEqual(funcs, ["sin(x)"])
         self.assertEqual((low, high), (-10.0, 10.0))
+
+    def test_explain_tree(self):
+        tree = format_ast(parse_expression("2+3*4"))
+        self.assertIn("Binary +", tree)
+        self.assertIn("Binary *", tree)
+        self.assertEqual(tree.count("Binary"), 2)
+        self.assertIn("Num 4", tree)
 
     def test_radix_formatting(self):
         self.assertEqual(format_value(255, 16), "0xff")
