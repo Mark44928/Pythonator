@@ -1,4 +1,5 @@
 import math
+import cmath
 import re
 from dataclasses import dataclass
 
@@ -180,18 +181,32 @@ CONSTANTS = {
     "m_e": 9.1093837015e-31,
     "m_p": 1.67262192369e-27,
     "e": math.e,
+    "i": 1j,
 }
 BUILTIN_FUNCTIONS = {
     "sqrt", "cbrt", "sin", "cos", "tan", "asin", "acos", "atan",
     "asinh", "acosh", "atanh", "log", "log2", "ln", "exp", "abs",
     "floor", "ceil", "round", "sign", "isprime", "nextprime", "prevprime",
     "min", "max", "clamp", "gcd", "lcm", "pow", "mod", "hypot",
-    "ncr", "npr", "fact",
+    "ncr", "npr", "fact", "arg", "re", "im", "conj",
 }
 RESERVED = set(CONSTANTS) | BUILTIN_FUNCTIONS | {"ans"}
 
+def is_finite(value):
+    if isinstance(value, complex):
+        return math.isfinite(value.real) and math.isfinite(value.imag)
+    return math.isfinite(value)
+
+def is_real(value):
+    return not isinstance(value, complex) or value.imag == 0
+
+def finite_real(value, label="argument"):
+    if not is_real(value) or not is_finite(value):
+        raise EngineError(f"{label} must be a finite real number")
+    return value.real if isinstance(value, complex) else value
+
 def is_prime(number):
-    if not math.isfinite(number) or number > 1e12:
+    if isinstance(number, complex) or not math.isfinite(number) or number > 1e12:
         raise EngineError("isprime out of range")
     n = int(math.floor(abs(number)))
     if n < 2:
@@ -208,7 +223,7 @@ def is_prime(number):
     return 1.0
 
 def next_prime(number):
-    if not math.isfinite(number) or number > 1e12:
+    if isinstance(number, complex) or not math.isfinite(number) or number > 1e12:
         raise EngineError("nextprime out of range")
     n = int(math.floor(abs(number))) + 1
     if n <= 2:
@@ -222,7 +237,7 @@ def next_prime(number):
     return float(n)
 
 def prev_prime(number):
-    if not math.isfinite(number) or number > 1e12:
+    if isinstance(number, complex) or not math.isfinite(number) or number > 1e12:
         raise EngineError("prevprime out of range")
     n = int(math.ceil(abs(number))) - 1
     if n < 2:
@@ -274,7 +289,7 @@ class Context:
         self.functions[name] = (params, body)
 
 def factorial(value):
-    if not math.isfinite(value) or value < 0 or value != math.floor(value) or value > 170:
+    if isinstance(value, complex) or not math.isfinite(value) or value < 0 or value != math.floor(value) or value > 170:
         raise EngineError("factorial argument must be a non-negative integer <= 170")
     n = int(math.floor(value))
     result = 1
@@ -376,9 +391,7 @@ def eval_node(node, ctx):
                 raise EngineError(str(exc)) from exc
             except ZeroDivisionError as exc:
                 raise EngineError("division by zero") from exc
-            if isinstance(result, complex):
-                raise EngineError("power result is not real")
-            if math.isinf(result):
+            if not is_finite(result):
                 raise EngineError("power overflow")
             return result
     if isinstance(node, Call):
@@ -386,6 +399,14 @@ def eval_node(node, ctx):
     raise EngineError("invalid expression")
 
 def call_function(node, ctx):
+    try:
+        return _call_function(node, ctx)
+    except EngineError:
+        raise
+    except (ValueError, OverflowError) as exc:
+        raise EngineError(str(exc)) from exc
+
+def _call_function(node, ctx):
     values = [eval_node(arg, ctx) for arg in node.args]
     name = node.name.lower()
     if name in ctx.functions:
@@ -413,60 +434,85 @@ def call_function(node, ctx):
     if len(values) == 0:
         raise EngineError(f"{name} expects at least one argument")
     first = values[0]
-    if name == "sqrt": return math.sqrt(first) if first >= 0 else _math_error("sqrt of negative number")
-    if name == "cbrt": return math.copysign(abs(first) ** (1 / 3), first)
-    if name == "sin": return math.sin(from_angle(first, ctx.angle))
-    if name == "cos": return math.cos(from_angle(first, ctx.angle))
-    if name == "tan": return math.tan(from_angle(first, ctx.angle))
-    if name == "asin": return to_angle(math.asin(first), ctx.angle) if -1 <= first <= 1 else _math_error("asin out of [-1, 1]")
-    if name == "acos": return to_angle(math.acos(first), ctx.angle) if -1 <= first <= 1 else _math_error("acos out of [-1, 1]")
-    if name == "atan": return to_angle(math.atan(first), ctx.angle)
-    if name == "asinh": return math.asinh(first)
-    if name == "acosh": return math.acosh(first) if first >= 1 else _math_error("acosh of value less than 1")
-    if name == "atanh": return math.atanh(first) if -1 < first < 1 else _math_error("atanh out of (-1, 1)")
-    if name == "log": return math.log10(first) if first > 0 else _math_error("log of non-positive number")
-    if name == "log2": return math.log2(first) if first > 0 else _math_error("log2 of non-positive number")
-    if name == "ln": return math.log(first) if first > 0 else _math_error("ln of non-positive number")
+    if is_real(first) and isinstance(first, complex):
+        # Arithmetic can produce complex values with a zero imaginary part;
+        # built-ins that use math.* must receive a plain float.
+        first = first.real
+    if name == "sqrt": return cmath.sqrt(first)
+    if name == "cbrt":
+        if not is_real(first):
+            return cmath.exp(cmath.log(first) / 3)
+        return math.copysign(abs(first) ** (1 / 3), first)
+    if name == "sin": return cmath.sin(first) if not is_real(first) else math.sin(from_angle(first, ctx.angle))
+    if name == "cos": return cmath.cos(first) if not is_real(first) else math.cos(from_angle(first, ctx.angle))
+    if name == "tan": return cmath.tan(first) if not is_real(first) else math.tan(from_angle(first, ctx.angle))
+    if name == "asin":
+        if not is_real(first): return cmath.asin(first)
+        return to_angle(math.asin(first), ctx.angle) if -1 <= first <= 1 else _math_error("asin out of [-1, 1]")
+    if name == "acos":
+        if not is_real(first): return cmath.acos(first)
+        return to_angle(math.acos(first), ctx.angle) if -1 <= first <= 1 else _math_error("acos out of [-1, 1]")
+    if name == "atan": return cmath.atan(first) if not is_real(first) else to_angle(math.atan(first), ctx.angle)
+    if name == "asinh": return cmath.asinh(first) if not is_real(first) else math.asinh(first)
+    if name == "acosh":
+        if not is_real(first): return cmath.acosh(first)
+        return math.acosh(first) if first >= 1 else _math_error("acosh of value less than 1")
+    if name == "atanh":
+        if not is_real(first): return cmath.atanh(first)
+        return math.atanh(first) if -1 < first < 1 else _math_error("atanh out of (-1, 1)")
+    if name == "log":
+        if not is_real(first): return cmath.log10(first)
+        return math.log10(first) if first > 0 else _math_error("log of non-positive number")
+    if name == "log2":
+        if not is_real(first): return cmath.log(first, 2)
+        return math.log2(first) if first > 0 else _math_error("log2 of non-positive number")
+    if name == "ln":
+        if not is_real(first): return cmath.log(first)
+        return math.log(first) if first > 0 else _math_error("ln of non-positive number")
     if name == "exp":
         try:
-            return math.exp(first)
+            return cmath.exp(first) if not is_real(first) else math.exp(first)
         except OverflowError as exc:
             raise EngineError("exp overflow") from exc
     if name == "abs": return abs(first)
-    if name == "floor": return math.floor(first)
-    if name == "ceil": return math.ceil(first)
-    if name == "round": return round(first)
-    if name == "sign": return math.copysign(1.0, first) if first != 0 else 0.0
+    if name in ("floor", "ceil", "round"):
+        value = finite_real(first, name)
+        return math.floor(value) if name == "floor" else math.ceil(value) if name == "ceil" else round(value)
+    if name == "sign":
+        if not is_real(first):
+            return first / abs(first) if first != 0 else 0j
+        return math.copysign(1.0, first) if first != 0 else 0.0
+    if name == "arg": return cmath.phase(first)
+    if name == "re": return first.real if isinstance(first, complex) else first
+    if name == "im": return first.imag if isinstance(first, complex) else 0.0
+    if name == "conj": return first.conjugate() if isinstance(first, complex) else first
     if name == "isprime":
-        if not math.isfinite(first):
-            raise EngineError("isprime out of range")
-        return is_prime(first)
+        return is_prime(finite_real(first, "isprime argument"))
     if name == "nextprime":
-        if not math.isfinite(first):
-            raise EngineError("nextprime out of range")
-        return next_prime(first)
+        return next_prime(finite_real(first, "nextprime argument"))
     if name == "prevprime":
-        if not math.isfinite(first):
-            raise EngineError("prevprime out of range")
-        return prev_prime(first)
-    if name == "min": return min(values)
-    if name == "max": return max(values)
+        return prev_prime(finite_real(first, "prevprime argument"))
+    if name == "min":
+        return min(finite_real(value, "min argument") for value in values)
+    if name == "max":
+        return max(finite_real(value, "max argument") for value in values)
     if name == "clamp":
         if len(values) != 3:
             raise EngineError("clamp expects 3 arguments")
-        return min(max(first, values[1]), values[2])
+        low, high = finite_real(values[1], "clamp argument"), finite_real(values[2], "clamp argument")
+        return min(max(finite_real(first, "clamp argument"), low), high)
     if name == "gcd":
         if len(values) < 2:
             raise EngineError("gcd expects 2 arguments")
-        if not math.isfinite(first) or not math.isfinite(values[1]):
-            raise EngineError("gcd arguments must be finite")
-        return float(math.gcd(int(abs(first)), int(abs(values[1]))))
+        a = finite_real(first, "gcd argument")
+        b = finite_real(values[1], "gcd argument")
+        return float(math.gcd(int(abs(a)), int(abs(b))))
     if name == "lcm":
         if len(values) < 2:
             raise EngineError("lcm expects 2 arguments")
-        if not math.isfinite(first) or not math.isfinite(values[1]):
-            raise EngineError("lcm arguments must be finite")
-        a, b = int(abs(first)), int(abs(values[1]))
+        a = finite_real(first, "lcm argument")
+        b = finite_real(values[1], "lcm argument")
+        a, b = int(abs(a)), int(abs(b))
         if not (a and b):
             return 0.0
         multiple = (a // math.gcd(a, b)) * b
@@ -483,25 +529,25 @@ def call_function(node, ctx):
             raise EngineError("power overflow") from exc
         except ZeroDivisionError as exc:
             raise EngineError("division by zero") from exc
-        if isinstance(result, complex):
-            raise EngineError("power result is not real")
-        if math.isinf(result):
+        if not is_finite(result):
             raise EngineError("power overflow")
         return result
     if name == "mod":
-        if len(values) < 2 or values[1] == 0:
+        a = finite_real(first, "mod argument")
+        b = finite_real(values[1], "mod argument") if len(values) > 1 else 0
+        if len(values) < 2 or b == 0:
             raise EngineError("mod expects a non-zero divisor")
-        return first - values[1] * math.floor(first / values[1])
+        return a - b * math.floor(a / b)
     if name == "hypot":
         if len(values) < 2:
             raise EngineError("hypot expects 2 arguments")
-        return math.hypot(first, values[1])
+        return math.hypot(finite_real(first, "hypot argument"), finite_real(values[1], "hypot argument"))
     if name == "ncr":
         if len(values) < 2:
             raise EngineError("ncr expects 2 arguments")
-        if not math.isfinite(first) or not math.isfinite(values[1]):
-            raise EngineError("ncr arguments must be finite")
-        n, r = int(first), int(values[1])
+        first = finite_real(first, "ncr argument")
+        second = finite_real(values[1], "ncr argument")
+        n, r = int(first), int(second)
         if not (0 <= r <= n):
             return 0.0
         if r == 0 or r == n:
@@ -519,9 +565,9 @@ def call_function(node, ctx):
     if name == "npr":
         if len(values) < 2:
             raise EngineError("npr expects 2 arguments")
-        if not math.isfinite(first) or not math.isfinite(values[1]):
-            raise EngineError("npr arguments must be finite")
-        n, r = int(first), int(values[1])
+        first = finite_real(first, "npr argument")
+        second = finite_real(values[1], "npr argument")
+        n, r = int(first), int(second)
         if not (0 <= r <= n):
             return 0.0
         if r == 0:
@@ -588,7 +634,21 @@ def eval_statements(text, ctx):
         results.append(value)
     return results
 
+def format_complex(value):
+    if value.imag == 0:
+        return format_number(value.real)
+    re = format_number(value.real)
+    im = format_number(abs(value.imag))
+    if im == "1":
+        im = ""
+    sign = "-" if value.imag < 0 else "+"
+    if value.real == 0:
+        return ("-" if value.imag < 0 else "") + im + "i"
+    return re + sign + im + "i"
+
 def format_number(value):
+    if isinstance(value, complex):
+        return format_complex(value)
     if value != value:
         return "nan"
     if value == math.inf:
@@ -605,6 +665,10 @@ def format_number(value):
     return text.replace("e+0", "e").replace("e-0", "e-")
 
 def format_value(value, radix=10):
+    if isinstance(value, complex):
+        if value.imag != 0:
+            return format_complex(value)
+        value = value.real
     if not math.isfinite(value):
         return format_number(value)
     if radix in (16, 2) and value == math.floor(value) and abs(value) < 9.2e18:

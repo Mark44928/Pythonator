@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pythonator"
-version = "0.3.0"
+version = "0.4.0"
 description = "A dependency-free Python calculator REPL and --eval tool in the spirit of Plusalator"
 readme = "README.md"
 requires-python = ">=3.10"

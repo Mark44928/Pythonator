@@ -8,7 +8,7 @@ import sys
 import tempfile
 
 from . import __version__
-from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value, format_ast, FUNCTION_DEF, VARIABLE_ASSIGN, RESERVED
+from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value, format_ast, FUNCTION_DEF, VARIABLE_ASSIGN, RESERVED, is_finite
 from .lineedit import LineEditor
 from .theme import ALL_THEMES, color, get_theme, theme_names
 
@@ -71,6 +71,13 @@ def last_result(results):
         if value is not None:
             return value
     return None
+
+def json_result(value):
+    if isinstance(value, complex):
+        if value.imag == 0:
+            return value.real if is_finite(value) else None
+        return {"real": value.real, "imag": value.imag} if is_finite(value) else None
+    return value if value is not None and is_finite(value) else None
 
 def radix_for_mode(mode):
     return {"hex": 16, "bin": 2, "sci": 0}.get(mode, 10)
@@ -208,7 +215,7 @@ def plot_expression(expressions, minimum, maximum, context):
                 context.vars["x"] = x
                 try:
                     value = eval_node(parse_expression(expr), context)
-                    values.append(value if math.isfinite(value) else None)
+                    values.append(value if not isinstance(value, complex) and math.isfinite(value) else None)
                 except EngineError:
                     values.append(None)
             series.append(values)
@@ -268,6 +275,7 @@ Commands:
   factorize <n>         prime factorization of n
   table <expr> [a b]     evaluate f(x) across a range
   plot <expr> [a b]      ASCII plot across a range
+  complex               use i, arg(), re(), im(), conj()
   version               show version
   exit, quit, q          leave Pythonator
 """
@@ -389,6 +397,9 @@ def run_repl():
                 + paint(theme.hint, " for commands, or enter an expression to calculate.")
             )
             continue
+        if command == "tea":
+            print(paint(theme.prompt, "HTTP 418 — I'm a teapot. The calculator declines to brew."))
+            continue
         if command == "vars":
             for name, value in sorted(context.vars.items()):
                 if name != "ans":
@@ -503,7 +514,7 @@ def run_repl():
                 n = min(n, 1000)
                 primes = [value for value in range(2, n + 1) if all(value % d for d in range(2, int(math.sqrt(value)) + 1))]
                 print(paint(theme.result, " ".join(str(value) for value in primes)))
-            except ValueError:
+            except (ValueError, OverflowError):
                 print(paint(theme.error, "primes [n]"))
             continue
         if command == "factorize":
@@ -514,7 +525,7 @@ def run_repl():
                     continue
                 factors = prime_factors(n)
                 print(paint(theme.result, f"{n} = " + " × ".join(str(factor) for factor in factors)))
-            except ValueError:
+            except (ValueError, OverflowError):
                 print(paint(theme.error, "factorize <n>"))
             continue
         if command == "table":
@@ -585,8 +596,7 @@ def main(argv=None):
         try:
             result = eval_cli(args.expression, config.get("angle", "rad"), mode)
             if args.json:
-                # RFC 8259 forbids Infinity/NaN literals; emit null instead.
-                finit = result if (result is not None and math.isfinite(result)) else None
+                finit = json_result(result)
                 print(json.dumps({"expression": args.expression, "result": finit}, separators=(",", ":")))
             elif result is not None:
                 text = format_value(result, radix_for_mode(mode))

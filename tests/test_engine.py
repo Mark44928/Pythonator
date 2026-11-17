@@ -1,3 +1,4 @@
+import math
 import unittest
 
 from pythonator.engine import Context, EngineError, eval_statements, format_number, format_value, parse_expression, eval_node, format_ast
@@ -35,10 +36,12 @@ class EngineTests(unittest.TestCase):
             self.evaluate("ncr(1e20, 1000000)")
         with self.assertRaises(EngineError):
             self.evaluate("npr(1e9, 1000000)")
-        with self.assertRaises(EngineError):
-            self.evaluate("(-8)^0.5")
-        with self.assertRaises(EngineError):
-            self.evaluate("pow(-8, 0.5)")
+        root = self.evaluate("(-8)^0.5")
+        self.assertAlmostEqual(root.real, 0, places=12)
+        self.assertAlmostEqual(root.imag, math.sqrt(8), places=12)
+        root = self.evaluate("pow(-8, 0.5)")
+        self.assertAlmostEqual(root.real, 0, places=12)
+        self.assertAlmostEqual(root.imag, math.sqrt(8), places=12)
         with self.assertRaises(EngineError):
             self.evaluate("pow(0, -1)")
 
@@ -85,6 +88,31 @@ class EngineTests(unittest.TestCase):
         self.assertIn("Binary *", tree)
         self.assertEqual(tree.count("Binary"), 2)
         self.assertIn("Num 4", tree)
+
+    def test_complex_numbers(self):
+        self.assertEqual(self.evaluate("i*i"), -1)
+        self.assertEqual(self.evaluate("sqrt(-1)"), 1j)
+        self.assertEqual(self.evaluate("abs(3+4i)"), 5)
+        self.assertAlmostEqual(self.evaluate("arg(i)"), math.pi / 2, places=12)
+        self.assertEqual(self.evaluate("conj(2+3i)"), 2 - 3j)
+        self.assertEqual(self.evaluate("re(2+3i)"), 2)
+        self.assertEqual(self.evaluate("im(2+3i)"), 3)
+
+    def test_real_valued_complex_arguments_to_builtins(self):
+        self.assertAlmostEqual(self.evaluate("cbrt(i*i)"), -1)
+        self.assertAlmostEqual(self.evaluate("sin(i*i)"), -0.8414709848078965, places=12)
+        self.assertAlmostEqual(self.evaluate("exp(i*i)"), math.exp(-1), places=12)
+        self.assertAlmostEqual(self.evaluate("atan(i*i)"), -math.pi / 4, places=12)
+        self.assertAlmostEqual(self.evaluate("asin(i*i)"), -math.pi / 2, places=12)
+        self.assertEqual(self.evaluate("round(i*i)"), -1)
+        with self.assertRaises(EngineError):
+            self.evaluate("log(i*i)")
+        with self.assertRaises(EngineError):
+            self.evaluate("asin(2+0i)")
+        with self.assertRaises(EngineError):
+            self.evaluate("atan(i)")
+        with self.assertRaises(EngineError):
+            self.evaluate("mod(3.5, 1e-308)")
 
     def test_radix_formatting(self):
         self.assertEqual(format_value(255, 16), "0xff")
