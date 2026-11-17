@@ -45,6 +45,9 @@ class CliTests(unittest.TestCase):
         result = self.run_cli("--eval", "1/0")
         self.assertEqual(result.returncode, 0)
         self.assertIn("division by zero", result.stdout)
+        result = self.run_cli("--no-such-option")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("unknown option", result.stderr)
 
 if __name__ == "__main__":
     unittest.main()

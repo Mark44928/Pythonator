@@ -8,7 +8,7 @@ import sys
 import tempfile
 
 from . import __version__
-from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value, format_ast, FUNCTION_DEF, VARIABLE_ASSIGN
+from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value, format_ast, FUNCTION_DEF, VARIABLE_ASSIGN, RESERVED
 from .lineedit import LineEditor
 from .theme import ALL_THEMES, color, get_theme, theme_names
 
@@ -131,40 +131,92 @@ def explain_text(rest, context):
         return tree + f"\n# {exc}"
     return tree + f"\n= {format_value(value, context.radix)}"
 
-def parse_plot_spec(rest):
+def parse_table_spec(rest):
     tokens = rest.split()
-    minimum, maximum = -10.0, 10.0
-    expression = rest
-    if len(tokens) >= 2:
+    candidates = []
+    if len(tokens) >= 3:
         try:
-            maximum = float(tokens[-1])
-            minimum = float(tokens[-2])
-            expression = " ".join(tokens[:-2])
+            candidates.append((" ".join(tokens[:-2]), float(tokens[-2]), float(tokens[-1])))
         except ValueError:
             pass
-    funcs = [part.strip() for part in expression.split(",") if part.strip()][:3]
-    if not funcs:
-        raise EngineError("plot takes an expression and optional xmin xmax")
-    if not maximum > minimum:
-        raise EngineError("plot needs xmax > xmin")
-    return funcs, minimum, maximum
+    if len(tokens) >= 2:
+        try:
+            candidates.append((" ".join(tokens[:-1]), -10.0, float(tokens[-1])))
+        except ValueError:
+            pass
+    candidates.append((rest, -10.0, 10.0))
+    for expression, minimum, maximum in candidates:
+        if not expression:
+            continue
+        try:
+            parse_expression(expression)
+        except EngineError:
+            continue
+        if not maximum > minimum:
+            raise EngineError("table needs xmax > xmin")
+        return expression, minimum, maximum
+    raise EngineError("table takes an expression and optional xmin xmax")
 
-def plot_expression(expressions, minimum, maximum):
+def split_top_level(text, separator=","):
+    parts, current, depth = [], "", 0
+    for char in text:
+        if char == "(":
+            depth += 1
+        elif char == ")" and depth > 0:
+            depth -= 1
+        if char == separator and depth == 0:
+            parts.append(current)
+            current = ""
+        else:
+            current += char
+    parts.append(current)
+    return [part.strip() for part in parts if part.strip()]
+
+def parse_plot_spec(rest):
+    tokens = rest.split()
+    candidates = []
+    if len(tokens) >= 3:
+        try:
+            candidates.append((" ".join(tokens[:-2]), float(tokens[-2]), float(tokens[-1])))
+        except ValueError:
+            pass
+    candidates.append((rest, -10.0, 10.0))
+    for expression, minimum, maximum in candidates:
+        funcs = split_top_level(expression)[:3]
+        if not funcs:
+            continue
+        try:
+            for func in funcs:
+                parse_expression(func)
+        except EngineError:
+            continue
+        if not maximum > minimum:
+            raise EngineError("plot needs xmax > xmin")
+        return funcs, minimum, maximum
+    raise EngineError("plot takes an expression and optional xmin xmax")
+
+def plot_expression(expressions, minimum, maximum, context):
     width = 57
     height = 17
     series = []
-    for expr in expressions:
-        values = []
-        for column in range(width):
-            x = minimum + (maximum - minimum) * column / (width - 1)
-            context = Context()
-            context.vars["x"] = x
-            try:
-                value = eval_node(parse_expression(expr), context)
-                values.append(value if math.isfinite(value) else None)
-            except EngineError:
-                values.append(None)
-        series.append(values)
+    old_x = context.vars.get("x")
+    try:
+        for expr in expressions:
+            values = []
+            for column in range(width):
+                x = minimum + (maximum - minimum) * column / (width - 1)
+                context.vars["x"] = x
+                try:
+                    value = eval_node(parse_expression(expr), context)
+                    values.append(value if math.isfinite(value) else None)
+                except EngineError:
+                    values.append(None)
+            series.append(values)
+    finally:
+        if old_x is None:
+            context.vars.pop("x", None)
+        else:
+            context.vars["x"] = old_x
     finite = [value for values in series for value in values if value is not None]
     if not finite:
         raise EngineError(f"no real values in [{minimum}, {maximum}]")
@@ -354,9 +406,15 @@ def run_repl():
             if not rest:
                 print(paint(theme.error, "del <name>"))
             else:
-                context.vars.pop(rest, None)
-                context.functions.pop(rest, None)
-                print(paint(theme.hint, f"deleted {rest}"))
+                if rest in RESERVED:
+                    print(paint(theme.error, f"{rest} is built in and cannot be deleted"))
+                else:
+                    hit = context.vars.pop(rest, None) is not None
+                    hit = context.functions.pop(rest, None) is not None or hit
+                    if hit:
+                        print(paint(theme.hint, f"deleted {rest}"))
+                    else:
+                        print(paint(theme.error, f"no such variable or function: {rest}"))
             continue
         if command == "theme":
             if not rest:
@@ -461,18 +519,19 @@ def run_repl():
             continue
         if command == "table":
             try:
-                expression, _, span = rest.partition(" ")
-                bounds = [float(part) for part in span.split()] if span else [-10.0, 10.0]
-                if len(bounds) == 1:
-                    bounds = [-10.0, bounds[0]]
-                if len(bounds) != 2:
-                    raise EngineError("table takes an expression and optional xmin xmax")
-                minimum, maximum = bounds
-                for index in range(16):
-                    x = minimum + (maximum - minimum) * index / 15
-                    context.vars["x"] = x
-                    value = eval_node(parse_expression(expression), context)
-                    print(paint(theme.hint, f"{format_number(x):>12}") + " " + paint(theme.result, f"{format_number(value):>18}"))
+                expression, minimum, maximum = parse_table_spec(rest)
+                old_x = context.vars.get("x")
+                try:
+                    for index in range(16):
+                        x = minimum + (maximum - minimum) * index / 15
+                        context.vars["x"] = x
+                        value = eval_node(parse_expression(expression), context)
+                        print(paint(theme.hint, f"{format_number(x):>12}") + " " + paint(theme.result, f"{format_number(value):>18}"))
+                finally:
+                    if old_x is None:
+                        context.vars.pop("x", None)
+                    else:
+                        context.vars["x"] = old_x
             except EngineError as exc:
                 print(paint(theme.error, str(exc)))
             continue
@@ -488,7 +547,7 @@ def run_repl():
         if command == "plot":
             try:
                 expressions, minimum, maximum = parse_plot_spec(rest)
-                plot_expression(expressions, minimum, maximum)
+                plot_expression(expressions, minimum, maximum, context)
             except (EngineError, ValueError) as exc:
                 print(paint(theme.error, str(exc)))
             continue
@@ -509,13 +568,16 @@ def main(argv=None):
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--help", "-h", action="store_true")
     parser.add_argument("--version", "-V", action="store_true")
-    args, _ = parser.parse_known_args(argv)
+    args, unknown = parser.parse_known_args(argv)
     if args.help:
         print(help_text(__version__), end="")
         return 0
     if args.version:
         print(f"pythonator {__version__}")
         return 0
+    if unknown:
+        print(f"pythonator: unknown option: {unknown[0]}", file=sys.stderr)
+        return 2
     if args.expression is not None:
         config = load_config()
         theme = get_theme(config.get("theme", "greenit"))
@@ -523,7 +585,9 @@ def main(argv=None):
         try:
             result = eval_cli(args.expression, config.get("angle", "rad"), mode)
             if args.json:
-                print(json.dumps({"expression": args.expression, "result": result}, separators=(",", ":")))
+                # RFC 8259 forbids Infinity/NaN literals; emit null instead.
+                finit = result if (result is not None and math.isfinite(result)) else None
+                print(json.dumps({"expression": args.expression, "result": finit}, separators=(",", ":")))
             elif result is not None:
                 text = format_value(result, radix_for_mode(mode))
                 print(paint(theme.result, text) if color_enabled() else text)

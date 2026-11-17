@@ -191,7 +191,7 @@ BUILTIN_FUNCTIONS = {
 RESERVED = set(CONSTANTS) | BUILTIN_FUNCTIONS | {"ans"}
 
 def is_prime(number):
-    if number > 1e12:
+    if not math.isfinite(number) or number > 1e12:
         raise EngineError("isprime out of range")
     n = int(math.floor(abs(number)))
     if n < 2:
@@ -208,7 +208,7 @@ def is_prime(number):
     return 1.0
 
 def next_prime(number):
-    if number > 1e12:
+    if not math.isfinite(number) or number > 1e12:
         raise EngineError("nextprime out of range")
     n = int(math.floor(abs(number))) + 1
     if n <= 2:
@@ -222,7 +222,7 @@ def next_prime(number):
     return float(n)
 
 def prev_prime(number):
-    if number > 1e12:
+    if not math.isfinite(number) or number > 1e12:
         raise EngineError("prevprime out of range")
     n = int(math.ceil(abs(number))) - 1
     if n < 2:
@@ -274,13 +274,28 @@ class Context:
         self.functions[name] = (params, body)
 
 def factorial(value):
-    if not math.isfinite(value) or value < 0 or value > 170:
-        return math.nan if value < 0 or not math.isfinite(value) else math.inf
+    if not math.isfinite(value) or value < 0 or value != math.floor(value) or value > 170:
+        raise EngineError("factorial argument must be a non-negative integer <= 170")
     n = int(math.floor(value))
     result = 1
     for item in range(2, n + 1):
         result *= item
     return float(result)
+
+def _log_comb(n, r):
+    try:
+        return math.lgamma(n + 1) - math.lgamma(r + 1) - math.lgamma(n - r + 1)
+    except (OverflowError, ValueError):
+        return math.inf
+
+def _log_perm(n, r):
+    try:
+        return math.lgamma(n + 1) - math.lgamma(n - r + 1)
+    except (OverflowError, ValueError):
+        return math.inf
+
+def _log_result_fits(log_value):
+    return math.isfinite(log_value) and log_value <= math.log(1.7976931348623157e308)
 
 def to_angle(value, mode):
     return math.degrees(value) if mode == "deg" else math.degrees(value) * (10 / 9) if mode == "grad" else value
@@ -359,6 +374,10 @@ def eval_node(node, ctx):
                 raise EngineError("power overflow") from exc
             except ValueError as exc:
                 raise EngineError(str(exc)) from exc
+            except ZeroDivisionError as exc:
+                raise EngineError("division by zero") from exc
+            if isinstance(result, complex):
+                raise EngineError("power result is not real")
             if math.isinf(result):
                 raise EngineError("power overflow")
             return result
@@ -379,7 +398,10 @@ def call_function(node, ctx):
         ctx.depth += 1
         try:
             for param, value in zip(params, values):
-                ctx.set_var(param, value)
+                # Bind params directly (not set_var) so names like "pi" can
+                # shadow built-ins inside the function body, matching the
+                # C++ engine's local-frame semantics.
+                ctx.vars[param] = value
             return eval_node(body, ctx)
         finally:
             ctx.depth -= 1
@@ -405,27 +427,53 @@ def call_function(node, ctx):
     if name == "log": return math.log10(first) if first > 0 else _math_error("log of non-positive number")
     if name == "log2": return math.log2(first) if first > 0 else _math_error("log2 of non-positive number")
     if name == "ln": return math.log(first) if first > 0 else _math_error("ln of non-positive number")
-    if name == "exp": return math.exp(first)
+    if name == "exp":
+        try:
+            return math.exp(first)
+        except OverflowError as exc:
+            raise EngineError("exp overflow") from exc
     if name == "abs": return abs(first)
     if name == "floor": return math.floor(first)
     if name == "ceil": return math.ceil(first)
     if name == "round": return round(first)
     if name == "sign": return math.copysign(1.0, first) if first != 0 else 0.0
-    if name == "isprime": return is_prime(first)
-    if name == "nextprime": return next_prime(first)
-    if name == "prevprime": return prev_prime(first)
+    if name == "isprime":
+        if not math.isfinite(first):
+            raise EngineError("isprime out of range")
+        return is_prime(first)
+    if name == "nextprime":
+        if not math.isfinite(first):
+            raise EngineError("nextprime out of range")
+        return next_prime(first)
+    if name == "prevprime":
+        if not math.isfinite(first):
+            raise EngineError("prevprime out of range")
+        return prev_prime(first)
     if name == "min": return min(values)
     if name == "max": return max(values)
     if name == "clamp":
         if len(values) != 3:
             raise EngineError("clamp expects 3 arguments")
         return min(max(first, values[1]), values[2])
-    if name == "gcd": return math.gcd(int(abs(first)), int(abs(values[1]))) if len(values) >= 2 else _math_error("gcd expects 2 arguments")
+    if name == "gcd":
+        if len(values) < 2:
+            raise EngineError("gcd expects 2 arguments")
+        if not math.isfinite(first) or not math.isfinite(values[1]):
+            raise EngineError("gcd arguments must be finite")
+        return float(math.gcd(int(abs(first)), int(abs(values[1]))))
     if name == "lcm":
         if len(values) < 2:
             raise EngineError("lcm expects 2 arguments")
+        if not math.isfinite(first) or not math.isfinite(values[1]):
+            raise EngineError("lcm arguments must be finite")
         a, b = int(abs(first)), int(abs(values[1]))
-        return float(abs(a * b) // math.gcd(a, b)) if a and b else 0.0
+        if not (a and b):
+            return 0.0
+        multiple = (a // math.gcd(a, b)) * b
+        try:
+            return float(multiple)
+        except OverflowError as exc:
+            raise EngineError("lcm result too large") from exc
     if name == "pow":
         if len(values) < 2:
             raise EngineError("pow expects 2 arguments")
@@ -433,6 +481,10 @@ def call_function(node, ctx):
             result = first ** values[1]
         except OverflowError as exc:
             raise EngineError("power overflow") from exc
+        except ZeroDivisionError as exc:
+            raise EngineError("division by zero") from exc
+        if isinstance(result, complex):
+            raise EngineError("power result is not real")
         if math.isinf(result):
             raise EngineError("power overflow")
         return result
@@ -447,13 +499,41 @@ def call_function(node, ctx):
     if name == "ncr":
         if len(values) < 2:
             raise EngineError("ncr expects 2 arguments")
+        if not math.isfinite(first) or not math.isfinite(values[1]):
+            raise EngineError("ncr arguments must be finite")
         n, r = int(first), int(values[1])
-        return float(math.comb(n, r)) if 0 <= r <= n else 0.0
+        if not (0 <= r <= n):
+            return 0.0
+        if r == 0 or r == n:
+            return 1.0
+        if r == 1 or r == n - 1:
+            return float(n)
+        # Reject before math.comb allocates a big integer: the float result is
+        # all this API can return, so anything past its range is unusable.
+        if not _log_result_fits(_log_comb(n, r)):
+            raise EngineError("ncr result too large")
+        try:
+            return float(math.comb(n, r))
+        except OverflowError as exc:
+            raise EngineError("ncr result too large") from exc
     if name == "npr":
         if len(values) < 2:
             raise EngineError("npr expects 2 arguments")
+        if not math.isfinite(first) or not math.isfinite(values[1]):
+            raise EngineError("npr arguments must be finite")
         n, r = int(first), int(values[1])
-        return float(math.factorial(n) // math.factorial(n - r)) if 0 <= r <= n else 0.0
+        if not (0 <= r <= n):
+            return 0.0
+        if r == 0:
+            return 1.0
+        if r == 1:
+            return float(n)
+        if not _log_result_fits(_log_perm(n, r)):
+            raise EngineError("npr result too large")
+        try:
+            return float(math.perm(n, r))
+        except OverflowError as exc:
+            raise EngineError("npr result too large") from exc
     if name == "fact": return factorial(first)
     if name in ctx.vars:
         result = ctx.get(name)

@@ -1,7 +1,7 @@
 import unittest
 
-from pythonator.engine import Context, eval_statements, format_number, format_value, parse_expression, eval_node, format_ast
-from pythonator.__main__ import parse_plot_spec
+from pythonator.engine import Context, EngineError, eval_statements, format_number, format_value, parse_expression, eval_node, format_ast
+from pythonator.__main__ import parse_plot_spec, parse_table_spec
 
 class EngineTests(unittest.TestCase):
     def test_precedence(self):
@@ -30,6 +30,17 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.evaluate("clamp(8, 0, 5)"), 5)
         self.assertEqual(self.evaluate("isprime(7)"), 1)
         self.assertEqual(self.evaluate("isprime(8)"), 0)
+        self.assertEqual(self.evaluate("ncr(5, 2)"), 10)
+        with self.assertRaises(EngineError):
+            self.evaluate("ncr(1e20, 1000000)")
+        with self.assertRaises(EngineError):
+            self.evaluate("npr(1e9, 1000000)")
+        with self.assertRaises(EngineError):
+            self.evaluate("(-8)^0.5")
+        with self.assertRaises(EngineError):
+            self.evaluate("pow(-8, 0.5)")
+        with self.assertRaises(EngineError):
+            self.evaluate("pow(0, -1)")
 
     def test_constants(self):
         self.assertAlmostEqual(self.evaluate("pi*2"), 6.283185307179586, places=12)
@@ -57,6 +68,16 @@ class EngineTests(unittest.TestCase):
         funcs, low, high = parse_plot_spec("sin(x)")
         self.assertEqual(funcs, ["sin(x)"])
         self.assertEqual((low, high), (-10.0, 10.0))
+        funcs, low, high = parse_plot_spec("max(x, 0)")
+        self.assertEqual(funcs, ["max(x, 0)"])
+        self.assertEqual((low, high), (-10.0, 10.0))
+        funcs, low, high = parse_plot_spec("x + 1")
+        self.assertEqual(funcs, ["x + 1"])
+        self.assertEqual((low, high), (-10.0, 10.0))
+        expression, low, high = parse_table_spec("x^2 -5 5")
+        self.assertEqual((expression, low, high), ("x^2", -5.0, 5.0))
+        expression, low, high = parse_table_spec("x + 1")
+        self.assertEqual((expression, low, high), ("x + 1", -10.0, 10.0))
 
     def test_explain_tree(self):
         tree = format_ast(parse_expression("2+3*4"))
