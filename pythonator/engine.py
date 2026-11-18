@@ -189,6 +189,9 @@ BUILTIN_FUNCTIONS = {
     "floor", "ceil", "round", "sign", "isprime", "nextprime", "prevprime",
     "min", "max", "clamp", "gcd", "lcm", "pow", "mod", "hypot",
     "ncr", "npr", "fact", "arg", "re", "im", "conj",
+    "normpdf", "normcdf", "binompdf", "binomcdf", "poissonpdf", "poissoncdf",
+    "logistic", "erf", "det2", "det3", "divcount", "totient",
+    "modpow", "floordiv", "ceildiv",
 }
 RESERVED = set(CONSTANTS) | BUILTIN_FUNCTIONS | {"ans"}
 
@@ -296,6 +299,51 @@ def factorial(value):
     for item in range(2, n + 1):
         result *= item
     return float(result)
+
+def _whole(value, label, maximum=10**12):
+    number = finite_real(value, label)
+    if number < 0 or number > maximum or number != math.floor(number):
+        raise EngineError(f"{label} must be a non-negative integer <= {maximum}")
+    return int(number)
+
+def _divcount(number):
+    n = _whole(number, "divcount argument")
+    if n == 0:
+        return float("inf")
+    count = 0
+    d = 1
+    while d <= n // d:
+        if n % d == 0:
+            count += 2 if d * d != n else 1
+        d += 1
+    return float(count)
+
+def _totient(number):
+    n = _whole(number, "totient argument", 10**9)
+    if n <= 1:
+        return 1.0 if n == 1 else 0.0
+    result = n
+    factor = 2
+    rest = n
+    while factor * factor <= rest:
+        if rest % factor == 0:
+            result -= result // factor
+            while rest % factor == 0:
+                rest //= factor
+        factor += 1 if factor == 2 else 2
+    if rest > 1:
+        result -= result // rest
+    return float(result)
+
+def _modpow(base, exponent, modulus):
+    base_i = int(finite_real(base, "modpow base"))
+    if abs(base_i) > 10**15:
+        raise EngineError("modpow base is out of range")
+    exp_i = _whole(exponent, "modpow exponent", 10**12)
+    mod_i = _whole(modulus, "modpow modulus", 10**15)
+    if mod_i == 0:
+        raise EngineError("modpow modulus cannot be zero")
+    return float(pow(base_i, exp_i, mod_i))
 
 def _log_comb(n, r):
     try:
@@ -581,6 +629,92 @@ def _call_function(node, ctx):
         except OverflowError as exc:
             raise EngineError("npr result too large") from exc
     if name == "fact": return factorial(first)
+    if name == "normpdf":
+        if len(values) != 3:
+            raise EngineError("normpdf expects x, mean and stddev")
+        x, mu, sd = (finite_real(value, "normpdf argument") for value in values)
+        if sd <= 0:
+            raise EngineError("normpdf stddev must be positive")
+        z = (x - mu) / sd
+        return math.exp(-0.5 * z * z) / (sd * math.sqrt(2 * math.pi))
+    if name == "normcdf":
+        if len(values) != 3:
+            raise EngineError("normcdf expects x, mean and stddev")
+        x, mu, sd = (finite_real(value, "normcdf argument") for value in values)
+        if sd <= 0:
+            raise EngineError("normcdf stddev must be positive")
+        return 0.5 * (1 + math.erf((x - mu) / (sd * math.sqrt(2))))
+    if name == "binompdf":
+        if len(values) != 3:
+            raise EngineError("binompdf expects k, n and p")
+        k = _whole(values[0], "binompdf k")
+        n = _whole(values[1], "binompdf n")
+        p = finite_real(values[2], "binompdf p")
+        if p < 0 or p > 1 or k > n:
+            raise EngineError("binompdf requires 0 <= p <= 1 and 0 <= k <= n")
+        return float(math.comb(n, k) * (p ** k) * ((1 - p) ** (n - k)))
+    if name == "binomcdf":
+        if len(values) != 3:
+            raise EngineError("binomcdf expects k, n and p")
+        k = _whole(values[0], "binomcdf k")
+        n = _whole(values[1], "binomcdf n")
+        p = finite_real(values[2], "binomcdf p")
+        if p < 0 or p > 1 or k > n:
+            raise EngineError("binomcdf requires 0 <= p <= 1 and 0 <= k <= n")
+        return float(sum(math.comb(n, i) * (p ** i) * ((1 - p) ** (n - i)) for i in range(k + 1)))
+    if name == "poissonpdf":
+        if len(values) != 2:
+            raise EngineError("poissonpdf expects k and lambda")
+        k = _whole(values[0], "poissonpdf k", 10**6)
+        lam = finite_real(values[1], "poissonpdf lambda")
+        if lam <= 0:
+            raise EngineError("poissonpdf lambda must be positive")
+        return math.exp(k * math.log(lam) - lam - math.lgamma(k + 1))
+    if name == "poissoncdf":
+        if len(values) != 2:
+            raise EngineError("poissoncdf expects k and lambda")
+        k = _whole(values[0], "poissoncdf k", 10**6)
+        lam = finite_real(values[1], "poissoncdf lambda")
+        if lam <= 0:
+            raise EngineError("poissoncdf lambda must be positive")
+        return float(sum(math.exp(i * math.log(lam) - lam - math.lgamma(i + 1)) for i in range(k + 1)))
+    if name == "logistic":
+        return 1 / (1 + math.exp(-finite_real(first, "logistic argument")))
+    if name == "erf":
+        return math.erf(finite_real(first, "erf argument"))
+    if name == "det2":
+        if len(values) != 4:
+            raise EngineError("det2 expects a, b, c, d")
+        a, b, c, d = (finite_real(value, "det2 argument") for value in values)
+        return a * d - b * c
+    if name == "det3":
+        if len(values) != 9:
+            raise EngineError("det3 expects nine entries, rows first")
+        m = [finite_real(value, "det3 argument") for value in values]
+        return (m[0] * m[4] * m[8] + m[1] * m[5] * m[6] + m[2] * m[3] * m[7] -
+                m[2] * m[4] * m[6] - m[1] * m[3] * m[8] - m[0] * m[5] * m[7])
+    if name == "divcount":
+        return _divcount(first)
+    if name == "totient":
+        return _totient(first)
+    if name == "modpow":
+        if len(values) != 3:
+            raise EngineError("modpow expects base, exponent and modulus")
+        return _modpow(values[0], values[1], values[2])
+    if name == "floordiv":
+        if len(values) != 2:
+            raise EngineError("floordiv expects dividend and divisor")
+        a, b = (finite_real(value, "floordiv argument") for value in values)
+        if b == 0:
+            raise EngineError("floordiv by zero")
+        return math.floor(a / b)
+    if name == "ceildiv":
+        if len(values) != 2:
+            raise EngineError("ceildiv expects dividend and divisor")
+        a, b = (finite_real(value, "ceildiv argument") for value in values)
+        if b == 0:
+            raise EngineError("ceildiv by zero")
+        return math.ceil(a / b)
     if name in ctx.vars:
         result = ctx.get(name)
         for value in values:

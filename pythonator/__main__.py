@@ -276,6 +276,9 @@ Commands:
   table <expr> [a b]     evaluate f(x) across a range
   plot <expr> [a b]      ASCII plot across a range
   complex               use i, arg(), re(), im(), conj()
+  normpdf(x,m,s)        normal density; normcdf(x,m,s) normal CDF
+  binomcdf(k,n,p)       cumulative binomial; poissoncdf(k,lambda) Poisson CDF
+  det2/det3             small-matrix determinants; modpow modular exponentiation
   version               show version
   exit, quit, q          leave Pythonator
 """

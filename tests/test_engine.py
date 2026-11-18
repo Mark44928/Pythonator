@@ -98,6 +98,23 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(self.evaluate("re(2+3i)"), 2)
         self.assertEqual(self.evaluate("im(2+3i)"), 3)
 
+    def test_distribution_and_linear_algebra_functions(self):
+        self.assertAlmostEqual(self.evaluate("normpdf(0,0,1)"), math.exp(0) / math.sqrt(2 * math.pi), places=12)
+        self.assertAlmostEqual(self.evaluate("normcdf(0,0,1)"), 0.5, places=12)
+        self.assertAlmostEqual(self.evaluate("binomcdf(2,3,0.5)"), 0.875, places=12)
+        self.assertAlmostEqual(self.evaluate("poissonpdf(0,2)"), math.exp(-2), places=12)
+        self.assertEqual(self.evaluate("det2(1,2,3,4)"), -2)
+        self.assertEqual(self.evaluate("det3(1,2,3,0,1,4,5,6,0)"), 1)
+        self.assertEqual(self.evaluate("modpow(7, 3, 9)"), 1)
+        self.assertEqual(self.evaluate("divcount(12)"), 6)
+        self.assertEqual(self.evaluate("totient(18)"), 6)
+        self.assertEqual(self.evaluate("floordiv(13,4)"), 3)
+        self.assertEqual(self.evaluate("ceildiv(13,4)"), 4)
+        with self.assertRaises(EngineError):
+            self.evaluate("normpdf(0,0,0)")
+        with self.assertRaises(EngineError):
+            self.evaluate("binompdf(4,3,0.5)")
+
     def test_real_valued_complex_arguments_to_builtins(self):
         self.assertAlmostEqual(self.evaluate("cbrt(i*i)"), -1)
         self.assertAlmostEqual(self.evaluate("sin(i*i)"), -0.8414709848078965, places=12)
