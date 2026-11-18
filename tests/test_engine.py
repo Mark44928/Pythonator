@@ -101,7 +101,13 @@ class EngineTests(unittest.TestCase):
     def test_distribution_and_linear_algebra_functions(self):
         self.assertAlmostEqual(self.evaluate("normpdf(0,0,1)"), math.exp(0) / math.sqrt(2 * math.pi), places=12)
         self.assertAlmostEqual(self.evaluate("normcdf(0,0,1)"), 0.5, places=12)
+        self.assertAlmostEqual(self.evaluate("binompdf(2,3,0.5)"), 0.375, places=12)
         self.assertAlmostEqual(self.evaluate("binomcdf(2,3,0.5)"), 0.875, places=12)
+        self.assertEqual(self.evaluate("binompdf(0,10,0)"), 1)
+        self.assertEqual(self.evaluate("binompdf(10,10,1)"), 1)
+        self.assertEqual(self.evaluate("binomcdf(9,10,1)"), 0)
+        with self.assertRaises(EngineError):
+            self.evaluate("binompdf(1, 1000001, 0.5)")
         self.assertAlmostEqual(self.evaluate("poissonpdf(0,2)"), math.exp(-2), places=12)
         self.assertEqual(self.evaluate("det2(1,2,3,4)"), -2)
         self.assertEqual(self.evaluate("det3(1,2,3,0,1,4,5,6,0)"), 1)

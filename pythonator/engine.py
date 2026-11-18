@@ -647,21 +647,37 @@ def _call_function(node, ctx):
     if name == "binompdf":
         if len(values) != 3:
             raise EngineError("binompdf expects k, n and p")
-        k = _whole(values[0], "binompdf k")
-        n = _whole(values[1], "binompdf n")
+        k = _whole(values[0], "binompdf k", 10**6)
+        n = _whole(values[1], "binompdf n", 10**6)
         p = finite_real(values[2], "binompdf p")
         if p < 0 or p > 1 or k > n:
             raise EngineError("binompdf requires 0 <= p <= 1 and 0 <= k <= n")
-        return float(math.comb(n, k) * (p ** k) * ((1 - p) ** (n - k)))
+        if p == 0:
+            return 1.0 if k == 0 else 0.0
+        if p == 1:
+            return 1.0 if k == n else 0.0
+        log_term = (math.lgamma(n + 1) - math.lgamma(k + 1) - math.lgamma(n - k + 1)
+                    + k * math.log(p) + (n - k) * math.log1p(-p))
+        return math.exp(log_term) if log_term > -745 else 0.0
     if name == "binomcdf":
         if len(values) != 3:
             raise EngineError("binomcdf expects k, n and p")
-        k = _whole(values[0], "binomcdf k")
-        n = _whole(values[1], "binomcdf n")
+        k = _whole(values[0], "binomcdf k", 10**6)
+        n = _whole(values[1], "binomcdf n", 10**6)
         p = finite_real(values[2], "binomcdf p")
         if p < 0 or p > 1 or k > n:
             raise EngineError("binomcdf requires 0 <= p <= 1 and 0 <= k <= n")
-        return float(sum(math.comb(n, i) * (p ** i) * ((1 - p) ** (n - i)) for i in range(k + 1)))
+        if p == 0:
+            return 1.0
+        if p == 1:
+            return 1.0 if k == n else 0.0
+        term = math.exp(n * math.log1p(-p))
+        total = term
+        ratio = p / (1 - p)
+        for index in range(1, k + 1):
+            term *= (n - index + 1) / index * ratio
+            total += term
+        return min(1.0, max(0.0, total))
     if name == "poissonpdf":
         if len(values) != 2:
             raise EngineError("poissonpdf expects k and lambda")
@@ -669,7 +685,8 @@ def _call_function(node, ctx):
         lam = finite_real(values[1], "poissonpdf lambda")
         if lam <= 0:
             raise EngineError("poissonpdf lambda must be positive")
-        return math.exp(k * math.log(lam) - lam - math.lgamma(k + 1))
+        log_term = k * math.log(lam) - lam - math.lgamma(k + 1)
+        return math.exp(log_term) if log_term > -745 else 0.0
     if name == "poissoncdf":
         if len(values) != 2:
             raise EngineError("poissoncdf expects k and lambda")
@@ -677,7 +694,12 @@ def _call_function(node, ctx):
         lam = finite_real(values[1], "poissoncdf lambda")
         if lam <= 0:
             raise EngineError("poissoncdf lambda must be positive")
-        return float(sum(math.exp(i * math.log(lam) - lam - math.lgamma(i + 1)) for i in range(k + 1)))
+        term = math.exp(-lam)
+        total = term
+        for index in range(1, k + 1):
+            term *= lam / index
+            total += term
+        return min(1.0, max(0.0, total))
     if name == "logistic":
         return 1 / (1 + math.exp(-finite_real(first, "logistic argument")))
     if name == "erf":

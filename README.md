@@ -1,5 +1,7 @@
 # Pythonator
 
+<p align="center"><img src="assets/logo.svg" width="760" alt="Pythonator logo"></p>
+
 A **dependency-free Python rewrite of Plusalator**: a calculator REPL and headless `--eval` CLI with Qalculate-style math, written in pure standard-library Python.
 
 ## Why
