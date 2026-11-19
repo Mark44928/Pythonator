@@ -52,15 +52,18 @@ class LineEditor:
             return []
 
     def save_history(self):
-        self.history_path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp = tempfile.mkstemp(prefix="pythonator_history_", dir=str(self.history_path.parent))
+        tmp = None
         try:
+            self.history_path.parent.mkdir(parents=True, exist_ok=True)
+            fd, tmp = tempfile.mkstemp(prefix="pythonator_history_", dir=str(self.history_path.parent))
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 for line in self.history[-200:]:
                     handle.write(line + "\n")
             os.replace(tmp, self.history_path)
+        except OSError:
+            pass
         finally:
-            if os.path.exists(tmp):
+            if tmp and os.path.exists(tmp):
                 os.unlink(tmp)
 
     def add_history(self, line):

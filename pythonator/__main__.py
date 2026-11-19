@@ -55,15 +55,18 @@ def load_config():
 
 def save_config(config):
     path = config_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(config, indent=2) + "\n"
-    fd, tmp = tempfile.mkstemp(prefix="pythonator_config_", dir=str(path.parent))
+    tmp = None
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(prefix="pythonator_config_", dir=str(path.parent))
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
             handle.write(payload)
         os.replace(tmp, path)
+    except OSError:
+        pass
     finally:
-        if os.path.exists(tmp):
+        if tmp and os.path.exists(tmp):
             os.unlink(tmp)
 
 def last_result(results):
@@ -215,7 +218,11 @@ def plot_expression(expressions, minimum, maximum, context):
                 context.vars["x"] = x
                 try:
                     value = eval_node(parse_expression(expr), context)
-                    values.append(value if not isinstance(value, complex) and math.isfinite(value) else None)
+                    if isinstance(value, complex):
+                        value = value.real if value.imag == 0 else None
+                    if value is not None and not math.isfinite(value):
+                        value = None
+                    values.append(value)
                 except EngineError:
                     values.append(None)
             series.append(values)
@@ -507,6 +514,8 @@ def run_repl():
                     print(paint(theme.hint, f"{label:<6}") + paint(theme.result, text))
             except EngineError as exc:
                 print(paint(theme.error, str(exc)))
+            except OverflowError:
+                print(paint(theme.error, "number too large"))
             continue
         if command == "primes":
             try:

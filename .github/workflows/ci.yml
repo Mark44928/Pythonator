@@ -20,3 +20,5 @@ jobs:
         run: python -m unittest discover -s tests -q
       - name: CLI smoke
         run: python -m pythonator --eval "2+3*4"
+      - name: Installer smoke
+        run: bash tests/install-smoke.sh

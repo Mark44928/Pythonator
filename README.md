@@ -15,9 +15,13 @@ No API key. No `eval()`. No dependencies.
 ```bash
 git clone https://github.com/Mark44928/Pythonator.git
 cd Pythonator
-./install.sh
+bash install.sh
 pythonator
 ```
+
+The installer creates an isolated venv and links the launcher into `$PREFIX/bin`
+on Termux or `~/.local/bin` on Linux. Use `--prefix DIR` to choose another bin
+directory and `--uninstall` to remove it safely.
 
 From a clone without installing:
 
@@ -32,7 +36,7 @@ Pythonator keeps Plusalator’s visual language:
 - a pyfiglet `standard` banner for Pythonator, rendered through an accent → prompt → result gradient
 - a full-width gradient rule with the current theme, var/function count, angle unit, radix mode and memory flag
 - the `⟨ py ⟩ ➤` prompt, dim `⟨ ·· ⟩ ➤` transient line and colored `= result`
-- all 18 Plusalator theme names, with the same RGB tables
+- all 19 Plusalator theme names, with the same RGB tables
 - a raw-mode line editor: arrow keys, Home/End, Delete, Ctrl+A/E/U/K/L/F, bracketed paste, prefix history and ghost autosuggest
 - `theme <name>`, `angle rad|deg|grad`, `mode dec|hex|bin|sci`, memory slots, `help`, `vars`, `funcs`, `stats`, `primes`, `factorize`, `table`, `plot`, `explain`
 

@@ -159,7 +159,7 @@ def parse_number(text):
         if cleaned.startswith("0o"):
             return float(int(cleaned, 8))
         return float(cleaned)
-    except ValueError as exc:
+    except (ValueError, OverflowError) as exc:
         raise EngineError(f"invalid number {text!r}") from exc
 
 CONSTANTS = {
