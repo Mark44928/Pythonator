@@ -36,7 +36,7 @@ Pythonator keeps Plusalator’s visual language:
 - a pyfiglet `standard` banner for Pythonator, rendered through an accent → prompt → result gradient
 - a full-width gradient rule with the current theme, var/function count, angle unit, radix mode and memory flag
 - the `⟨ py ⟩ ➤` prompt, dim `⟨ ·· ⟩ ➤` transient line and colored `= result`
-- all 19 Plusalator theme names, with the same RGB tables
+- all 20 Plusalator theme names, with the same RGB tables
 - a raw-mode line editor: arrow keys, Home/End, Delete, Ctrl+A/E/U/K/L/F, bracketed paste, prefix history and ghost autosuggest
 - `theme <name>`, `angle rad|deg|grad`, `mode dec|hex|bin|sci`, memory slots, `help`, `vars`, `funcs`, `stats`, `primes`, `factorize`, `table`, `plot`, `explain`
 
@@ -113,7 +113,7 @@ make check
 - [NoNameOS](https://github.com/Mark44928/NoNameOS) — OS simulation in a single C++17 file — virtual FS, real shell
 - [Greenit](https://github.com/Mark44928/Greenit) — green-injected theme family — dark + light, single palette.json
 - [Bluney](https://github.com/Mark44928/Bluney) — blue-injected theme family — dark + light, single palette.json
-- [CalculaHTML](https://github.com/Mark44928/CalculaHTML) — static HTML calculator — 16 themes + System mode, zero deps
+- [CalculaHTML](https://github.com/Mark44928/CalculaHTML) — static HTML calculator — 17 themes + System mode, zero deps
 - [android12-fastfetch](https://github.com/Mark44928/android12-fastfetch) — fastfetch config for Android 12 + native X11 Termux desktops
 - [Android9-audios](https://github.com/Mark44928/Android9-audios) — 217 stock Android 9 system sounds + per-file SHA-256
 - [debloat-android-tv](https://github.com/Mark44928/debloat-android-tv) — ADB debloat for rooted Android 9+ TV sticks & boxes
