@@ -56,6 +56,7 @@ pythonator --eval "sqrt(16)"
 pythonator --eval "200+10%"
 pythonator --eval "f(x)=x^2+1; f(3)"
 pythonator --eval "2+3" --json
+pythonator --convert 5 km mi
 ```
 
 Interactive:
@@ -74,9 +75,11 @@ sum    15
 mean   3
 median 3
 stddev 1.4142135623730951
+⟨ py ⟩ units 100 c f
+100 c = 212 f
 ```
 
-Commands: `help`, `vars`, `funcs`, `reset`, `del <name>`, `theme [name]`, `angle rad|deg|grad`, `mode dec|hex|bin|sci`, `ms`/`mr`/`m+`/`m-`/`mc`, `stats`, `primes [n]`, `factorize <n>`, `table <expr> [a b]`, `plot <expr> [a b]`, `explain <expr>`, `exit`.
+Commands: `help`, `vars`, `funcs`, `reset`, `del <name>`, `theme [name]`, `angle rad|deg|grad`, `mode dec|hex|bin|sci`, `ms`/`mr`/`m+`/`m-`/`mc`, `stats`, `units <v> <from> <to>`, `primes [n]`, `factorize <n>`, `table <expr> [a b]`, `plot <expr> [a b]`, `explain <expr>`, `exit`.
 
 ## Engine
 
@@ -85,6 +88,7 @@ Commands: `help`, `vars`, `funcs`, `reset`, `del <name>`, `theme [name]`, `angle
 - Implicit multiplication: `2x`, `2(3+4)`, `(2+3)(4+5)`
 - Literals: decimal, `0x`, `0b`, `0o`
 - Output radix: decimal, hex (`0xff`), binary (`0b101`) or scientific notation
+- Unit conversion: `units 5 km mi`, `--convert 100 c f` across length, mass, speed, volume, area, data, time, energy, pressure, angle and temperature
 - Memory slots: `ms`, `mr`, `m+`, `m-`, `mc`; the status line shows `M` while memory is live
 - Built-in functions: sqrt, cbrt, sin/cos/tan and inverses, asinh/acosh/atanh, log/log2/ln/exp, abs, floor/ceil/round/sign, isprime/nextprime/prevprime, min/max, clamp, gcd/lcm, pow, mod, hypot, ncr/npr, fact, arg/re/im/conj, normpdf/normcdf, binompdf/binomcdf, poissonpdf/poissoncdf, logistic, erf, det2/det3, divcount, totient, modpow, floordiv/ceildiv
 - Built-in constants: pi, tau, phi, grav, G, kB, R, NA, c, h, hbar, sigma, eps0, mu0, u, m_e, m_p, e, i

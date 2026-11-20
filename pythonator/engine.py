@@ -195,6 +195,54 @@ BUILTIN_FUNCTIONS = {
 }
 RESERVED = set(CONSTANTS) | BUILTIN_FUNCTIONS | {"ans"}
 
+# Conversion factors against one base unit per category; temperature is special.
+UNIT_TABLE = {
+    "m": (0, 1.0), "km": (0, 1000.0), "cm": (0, 0.01), "mm": (0, 0.001),
+    "mi": (0, 1609.344), "yd": (0, 0.9144), "ft": (0, 0.3048), "in": (0, 0.0254),
+    "nmi": (0, 1852.0),
+    "kg": (1, 1.0), "g": (1, 0.001), "mg": (1, 1e-6), "lb": (1, 0.45359237),
+    "oz": (1, 0.028349523125), "st": (1, 6.35029318), "tonne": (1, 1000.0),
+    "m/s": (2, 1.0), "km/h": (2, 0.2777777777777778), "mph": (2, 0.44704),
+    "kn": (2, 0.5144444444444445),
+    "l": (3, 1.0), "ml": (3, 0.001), "m3": (3, 1000.0), "gal": (3, 3.785411784),
+    "qt": (3, 0.946352946), "pt": (3, 0.473176473), "cup": (3, 0.2365882365),
+    "floz": (3, 0.0295735295625),
+    "m2": (4, 1.0), "km2": (4, 1e6), "ha": (4, 10000.0), "acre": (4, 4046.8564224),
+    "ft2": (4, 0.09290304), "in2": (4, 0.00064516),
+    "b": (5, 1.0), "kb": (5, 1000.0), "mb": (5, 1e6), "gb": (5, 1e9),
+    "tb": (5, 1e12), "kib": (5, 1024.0), "mib": (5, 1048576.0),
+    "gib": (5, 1073741824.0), "tib": (5, 1099511627776.0),
+    "s": (6, 1.0), "min": (6, 60.0), "h": (6, 3600.0), "day": (6, 86400.0),
+    "week": (6, 604800.0),
+    "j": (7, 1.0), "kj": (7, 1000.0), "cal": (7, 4.184), "kcal": (7, 4184.0),
+    "wh": (7, 3600.0), "kwh": (7, 3600000.0),
+    "pa": (8, 1.0), "kpa": (8, 1000.0), "bar": (8, 100000.0), "atm": (8, 101325.0),
+    "psi": (8, 6894.757293168), "mmhg": (8, 133.322387415),
+    "rad": (9, 1.0), "deg": (9, math.pi / 180), "grad": (9, math.pi / 200),
+}
+_TEMP = {"c": "c", "celsius": "c", "f": "f", "fahrenheit": "f", "k": "k", "kelvin": "k"}
+
+def convert_unit(value, source, target):
+    source = source.lower()
+    target = target.lower()
+    if source == target:
+        return value
+    if source in _TEMP or target in _TEMP:
+        if source not in _TEMP or target not in _TEMP:
+            raise EngineError("temperature units cannot mix with other categories")
+        celsius = value if _TEMP[source] == "c" else (value - 32) * 5 / 9 if _TEMP[source] == "f" else value - 273.15
+        if celsius < -273.15:
+            raise EngineError("temperature is below absolute zero")
+        kind = _TEMP[target]
+        return celsius if kind == "c" else celsius * 9 / 5 + 32 if kind == "f" else celsius + 273.15
+    if source not in UNIT_TABLE or target not in UNIT_TABLE:
+        raise EngineError("unknown unit")
+    source_category, source_factor = UNIT_TABLE[source]
+    target_category, target_factor = UNIT_TABLE[target]
+    if source_category != target_category:
+        raise EngineError("units belong to different categories")
+    return value * source_factor / target_factor
+
 def is_finite(value):
     if isinstance(value, complex):
         return math.isfinite(value.real) and math.isfinite(value.imag)

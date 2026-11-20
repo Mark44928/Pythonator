@@ -8,7 +8,7 @@ import sys
 import tempfile
 
 from . import __version__
-from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value, format_ast, FUNCTION_DEF, VARIABLE_ASSIGN, RESERVED, is_finite
+from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value, format_ast, FUNCTION_DEF, VARIABLE_ASSIGN, RESERVED, is_finite, convert_unit
 from .lineedit import LineEditor
 from .theme import ALL_THEMES, color, get_theme, theme_names
 
@@ -262,6 +262,7 @@ Usage:
   pythonator
   pythonator --eval "2+3*4"
   pythonator --eval "sqrt(16)" --json
+  pythonator --convert 5 km mi
 
 Commands:
   help                  show this help
@@ -278,6 +279,7 @@ Commands:
   mc                    clear memory
   explain <expr>          show the parsed expression tree
   stats <n...>          count/min/max/sum/mean/median/stddev
+  units <v> <from> <to> convert length, mass, speed, volume, area, data, time, energy, pressure, angle, temperature
   primes [n]            list primes up to n
   factorize <n>         prime factorization of n
   table <expr> [a b]     evaluate f(x) across a range
@@ -517,6 +519,20 @@ def run_repl():
             except OverflowError:
                 print(paint(theme.error, "number too large"))
             continue
+        if command == "units":
+            parts = rest.split()
+            if len(parts) != 3:
+                print(paint(theme.error, "units <value> <from> <to>"))
+                continue
+            try:
+                value = float(parts[0])
+                result = convert_unit(value, parts[1], parts[2])
+                print(paint(theme.result, f"{format_number(value)} {parts[1]} = {format_number(result)} {parts[2]}"))
+            except ValueError:
+                print(paint(theme.error, "units <value> <from> <to>"))
+            except EngineError as exc:
+                print(paint(theme.error, str(exc)))
+            continue
         if command == "primes":
             try:
                 n = int(float(rest or "100"))
@@ -588,6 +604,7 @@ def run_repl():
 def main(argv=None):
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--eval", dest="expression")
+    parser.add_argument("--convert", nargs=3, metavar=("VALUE", "FROM", "TO"))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--help", "-h", action="store_true")
     parser.add_argument("--version", "-V", action="store_true")
@@ -601,6 +618,25 @@ def main(argv=None):
     if unknown:
         print(f"pythonator: unknown option: {unknown[0]}", file=sys.stderr)
         return 2
+    if args.convert:
+        config = load_config()
+        theme = get_theme(config.get("theme", "greenit"))
+        raw, source, target = args.convert
+        try:
+            value = float(raw)
+            result = convert_unit(value, source, target)
+        except ValueError:
+            print("pythonator: --convert needs a numeric value", file=sys.stderr)
+            return 2
+        except EngineError as exc:
+            print(f"pythonator: {exc}", file=sys.stderr)
+            return 2
+        if args.json:
+            print(json.dumps({"value": float(raw), "from": source, "to": target, "result": json_result(result)}, separators=(",", ":")))
+        else:
+            text = f"{format_number(float(raw))} {source} = {format_number(result)} {target}"
+            print(paint(theme.result, text) if color_enabled() else text)
+        return 0
     if args.expression is not None:
         config = load_config()
         theme = get_theme(config.get("theme", "greenit"))
@@ -623,7 +659,7 @@ def main(argv=None):
             print(str(exc))
             return 0
     if args.json:
-        print("--json requires --eval <expr>", file=sys.stderr)
+        print("--json requires --eval <expr> or --convert <value> <from> <to>", file=sys.stderr)
         return 2
     return run_repl()
 

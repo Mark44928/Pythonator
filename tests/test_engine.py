@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from pythonator.engine import Context, EngineError, eval_statements, format_number, format_value, parse_expression, eval_node, format_ast
+from pythonator.engine import Context, EngineError, eval_statements, format_number, format_value, parse_expression, eval_node, format_ast, convert_unit
 from pythonator.__main__ import parse_plot_spec, parse_table_spec
 
 class EngineTests(unittest.TestCase):
@@ -81,6 +81,18 @@ class EngineTests(unittest.TestCase):
         self.assertEqual((expression, low, high), ("x^2", -5.0, 5.0))
         expression, low, high = parse_table_spec("x + 1")
         self.assertEqual((expression, low, high), ("x + 1", -10.0, 10.0))
+
+    def test_unit_conversion(self):
+        self.assertAlmostEqual(convert_unit(1, "km", "m"), 1000.0)
+        self.assertAlmostEqual(convert_unit(100, "c", "f"), 212.0)
+        self.assertAlmostEqual(convert_unit(32, "fahrenheit", "celsius"), 0.0)
+        self.assertAlmostEqual(convert_unit(1, "gb", "mib"), 1000.0 * 1000 * 1000 / 1048576)
+        with self.assertRaises(EngineError):
+            convert_unit(1, "km", "kg")
+        with self.assertRaises(EngineError):
+            convert_unit(1, "km", "zzz")
+        with self.assertRaises(EngineError):
+            convert_unit(-300, "c", "k")
 
     def test_explain_tree(self):
         tree = format_ast(parse_expression("2+3*4"))

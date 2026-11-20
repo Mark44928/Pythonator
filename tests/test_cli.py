@@ -49,6 +49,23 @@ class CliTests(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["result"], {"real": 1.0, "imag": 2.0})
 
+    def test_convert(self):
+        result = self.run_cli("--convert", "5", "km", "mi")
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(result.stdout.startswith("5 km = 3.10685596119 mi"), result.stdout)
+        result = self.run_cli("--json", "--convert", "100", "c", "f")
+        payload = json.loads(result.stdout)
+        self.assertEqual(payload["result"], 212.0)
+        result = self.run_cli("--convert", "1", "km", "kg")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("different categories", result.stderr)
+
+    def test_repl_units(self):
+        result = self.run_cli(input_text="units 1 km m\nunits 1 km kg\nq\n")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("1 km = 1000 m", result.stdout)
+        self.assertIn("different categories", result.stdout)
+
     def test_error(self):
         result = self.run_cli("--eval", "1/0")
         self.assertEqual(result.returncode, 0)
