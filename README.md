@@ -46,6 +46,8 @@ Pythonator keeps Plusalator’s visual language:
 |---|---|---|
 | ![Pythonator REPL](docs/screenshot-repl.png) | ![Pythonator modes](docs/screenshot-modes.png) | ![Pythonator plot](docs/screenshot-plot.png) |
 
+![Pythonator unit conversion](docs/screenshot-units.png)
+
 ## Usage
 
 Headless:
