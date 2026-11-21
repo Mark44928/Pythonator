@@ -151,6 +151,18 @@ class LineEditor:
             if value == 0x0C: return ("ctrl_l", "")
             if value == 0x06: return ("ctrl_f", "")
             if value == 0x09 or value < 0x20: return ("ignore", "")
+            if value >= 0x80:
+                extra = 1 if value < 0xE0 else (2 if value < 0xF0 else 3)
+                buf = bytearray([value])
+                for _ in range(extra):
+                    b = os.read(self.fd, 1)
+                    if not b:
+                        break
+                    buf += b
+                try:
+                    return ("char", buf.decode("utf-8"))
+                except UnicodeDecodeError:
+                    return ("ignore", "")
             return ("char", chr(value))
         ready, _, _ = select.select([self.fd], [], [], 0.12)
         if not ready:
@@ -240,12 +252,10 @@ class LineEditor:
         self.was_transient = False
         self.redraw(prompt, buffer, cursor)
         submitted = False
-        quit_editor = False
         try:
             while True:
                 key, data = self.read_key()
                 if key == "eof":
-                    quit_editor = True
                     break
                 if key == "ignore":
                     continue
@@ -261,7 +271,6 @@ class LineEditor:
                     continue
                 if key == "ctrl_d":
                     if not buffer:
-                        quit_editor = True
                         break
                     if cursor < len(buffer):
                         buffer = buffer[:cursor] + buffer[cursor + 1:]

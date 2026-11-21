@@ -8,9 +8,23 @@ import sys
 import tempfile
 
 from . import __version__
-from .engine import Context, EngineError, eval_statements, eval_node, parse_expression, format_number, format_value, format_ast, FUNCTION_DEF, VARIABLE_ASSIGN, RESERVED, is_finite, convert_unit
+from .engine import (
+    FUNCTION_DEF,
+    RESERVED,
+    VARIABLE_ASSIGN,
+    Context,
+    EngineError,
+    convert_unit,
+    eval_node,
+    eval_statements,
+    format_ast,
+    format_number,
+    format_value,
+    is_finite,
+    parse_expression,
+)
 from .lineedit import LineEditor
-from .theme import ALL_THEMES, color, get_theme, theme_names
+from .theme import color, get_theme, theme_names
 
 BANNER = r"""
  ____        _   _                       _
@@ -550,6 +564,9 @@ def run_repl():
                 n = int(float(rest))
                 if n == 0:
                     print(paint(theme.error, "factorize expects n != 0"))
+                    continue
+                if abs(n) > 10**12:
+                    print(paint(theme.error, "factorize supports |n| <= 10^12"))
                     continue
                 factors = prime_factors(n)
                 print(paint(theme.result, f"{n} = " + " × ".join(str(factor) for factor in factors)))

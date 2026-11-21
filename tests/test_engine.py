@@ -1,8 +1,17 @@
 import math
 import unittest
 
-from pythonator.engine import Context, EngineError, eval_statements, format_number, format_value, parse_expression, eval_node, format_ast, convert_unit
 from pythonator.__main__ import parse_plot_spec, parse_table_spec
+from pythonator.engine import (
+    Context,
+    EngineError,
+    convert_unit,
+    eval_statements,
+    format_ast,
+    format_value,
+    parse_expression,
+)
+
 
 class EngineTests(unittest.TestCase):
     def test_precedence(self):
@@ -49,7 +58,7 @@ class EngineTests(unittest.TestCase):
         self.assertAlmostEqual(self.evaluate("pi*2"), 6.283185307179586, places=12)
 
     def test_unknown_variable(self):
-        with self.assertRaises(Exception):
+        with self.assertRaises(EngineError):
             self.evaluate("no_such_variable")
 
     def test_reset_preserves_settings_and_memory(self):
@@ -155,6 +164,19 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(format_value(-10, 16), "-0xa")
         self.assertIn("e", format_value(1234, 0))
         self.assertEqual(format_value(1234.5, 16), "1234.5")
+
+    def test_number_number_implicit_multiplication_is_rejected(self):
+        for text in ("1 000", "1.2.3"):
+            with self.assertRaises(EngineError):
+                self.evaluate(text)
+
+    def test_prime_helpers_reject_non_integers_and_negatives(self):
+        with self.assertRaises(EngineError):
+            self.evaluate("isprime(2.5)")
+        with self.assertRaises(EngineError):
+            self.evaluate("prevprime(-5)")
+        self.assertEqual(self.evaluate("isprime(-7)"), 1)
+        self.assertEqual(self.evaluate("prevprime(2.5)"), 2)
 
     def evaluate(self, text):
         ctx = Context()

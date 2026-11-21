@@ -1,7 +1,8 @@
-import math
 import cmath
+import math
 import re
 from dataclasses import dataclass
+
 
 class EngineError(Exception):
     pass
@@ -73,7 +74,7 @@ class Parser:
             raise EngineError("empty expression")
         node = self.parse_expression(0)
         if self.peek() is not None:
-            kind, value = self.peek()
+            value = self.peek()[1]
             raise EngineError(f"unexpected token {value!r}")
         return node
 
@@ -93,7 +94,10 @@ class Parser:
                 self.advance()
                 node = Unary(value, node)
                 continue
-            implicit = kind in ("number", "name") or (kind == "op" and value == "(")
+            implicit = (
+                kind == "name" or (kind == "op" and value == "(") or
+                (kind == "number" and not isinstance(node, Num))
+            )
             if implicit:
                 lbp = 20
             elif kind == "op" and value in "+-*/^":
@@ -259,7 +263,9 @@ def finite_real(value, label="argument"):
 def is_prime(number):
     if isinstance(number, complex) or not math.isfinite(number) or number > 1e12:
         raise EngineError("isprime out of range")
-    n = int(math.floor(abs(number)))
+    if number != math.floor(number):
+        raise EngineError("isprime expects an integer")
+    n = math.floor(abs(number))
     if n < 2:
         return 0.0
     if n == 2:
@@ -276,7 +282,7 @@ def is_prime(number):
 def next_prime(number):
     if isinstance(number, complex) or not math.isfinite(number) or number > 1e12:
         raise EngineError("nextprime out of range")
-    n = int(math.floor(abs(number))) + 1
+    n = math.floor(abs(number)) + 1
     if n <= 2:
         return 2.0
     if n % 2 == 0:
@@ -290,7 +296,9 @@ def next_prime(number):
 def prev_prime(number):
     if isinstance(number, complex) or not math.isfinite(number) or number > 1e12:
         raise EngineError("prevprime out of range")
-    n = int(math.ceil(abs(number))) - 1
+    if number < 2:
+        raise EngineError("prevprime: no prime strictly before argument")
+    n = math.ceil(number) - 1
     if n < 2:
         raise EngineError("prevprime: no prime strictly before argument")
     if n == 2:
@@ -342,7 +350,7 @@ class Context:
 def factorial(value):
     if isinstance(value, complex) or not math.isfinite(value) or value < 0 or value != math.floor(value) or value > 170:
         raise EngineError("factorial argument must be a non-negative integer <= 170")
-    n = int(math.floor(value))
+    n = math.floor(value)
     result = 1
     for item in range(2, n + 1):
         result *= item
@@ -853,7 +861,7 @@ def format_complex(value):
 def format_number(value):
     if isinstance(value, complex):
         return format_complex(value)
-    if value != value:
+    if math.isnan(value):
         return "nan"
     if value == math.inf:
         return "inf"

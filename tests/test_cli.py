@@ -81,5 +81,11 @@ class CliTests(unittest.TestCase):
         self.assertIn("factorize <n>", result.stdout)
         self.assertNotIn("Traceback", result.stderr)
 
+    def test_factorize_refuses_numbers_above_the_cap(self):
+        result = self.run_cli(input_text="factorize 999999999999999\nq\n")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("factorize supports |n| <= 10^12", result.stdout)
+        self.assertNotIn("Traceback", result.stderr)
+
 if __name__ == "__main__":
     unittest.main()
