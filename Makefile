@@ -16,7 +16,7 @@ test:
 	$(PYTHON) -m unittest discover -s tests -q
 
 eval:
-	$(PYTHON) -m pythonator --eval "2+3*4"
+	XDG_CONFIG_HOME=$(TMPDIR)/pythonator-check-config $(PYTHON) -m pythonator --eval "2+3*4"
 
 install:
 	$(PYTHON) -m pip install .
