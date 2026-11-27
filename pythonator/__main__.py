@@ -625,12 +625,17 @@ def main(argv=None):
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--help", "-h", action="store_true")
     parser.add_argument("--version", "-V", "-v", action="store_true")
+    parser.add_argument("--list-functions", action="store_true", help="list built-in functions and exit")
     args, unknown = parser.parse_known_args(argv)
     if args.help:
         print(help_text(__version__), end="")
         return 0
     if args.version:
         print(f"pythonator {__version__}")
+        return 0
+    if args.list_functions:
+        from .engine import BUILTIN_FUNCTIONS
+        print("built-in functions: " + ", ".join(sorted(BUILTIN_FUNCTIONS)))
         return 0
     if unknown:
         print(f"pythonator: unknown option: {unknown[0]}", file=sys.stderr)
