@@ -624,7 +624,7 @@ def main(argv=None):
     parser.add_argument("--convert", nargs=3, metavar=("VALUE", "FROM", "TO"))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--help", "-h", action="store_true")
-    parser.add_argument("--version", "-V", action="store_true")
+    parser.add_argument("--version", "-V", "-v", action="store_true")
     args, unknown = parser.parse_known_args(argv)
     if args.help:
         print(help_text(__version__), end="")
