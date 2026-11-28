@@ -42,6 +42,8 @@ Pythonator keeps Plusalator’s visual language:
 
 ## Screenshots
 
+<img src="docs/screenshot-cli.png" width="640" alt="Pythonator CLI screenshot">
+
 | REPL and stats | Hex/scientific modes + memory | Multi-curve plot |
 |---|---|---|
 | ![Pythonator REPL](docs/screenshot-repl.png) | ![Pythonator modes](docs/screenshot-modes.png) | ![Pythonator plot](docs/screenshot-plot.png) |
